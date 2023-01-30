@@ -204,7 +204,7 @@ auto main(int argc, char** argv) -> int {
                     // If using fixed TX mode, the fallback in/out count
                     // should be 2/2
                     if(cfg.m_fixed_tx_mode && cfg.m_fixed_tx_rate > 0.0) {
-                        tx = wallet.send_to(2, 2, wallet.generate_key(), true);
+                        continue;
                     } else {
                         // Otherwise send a regular transaction and let the
                         // wallet determine the input/output count.
