@@ -191,34 +191,26 @@ auto main(int argc, char** argv) -> int {
 
             // tx is empty so there wasn't a double-spend available for us to
             // send. Try to send a new (valid) transaction instead.
-            if(!tx) {
+            if(!tx && send_fixed) {
                 // If we're sending fixed-size transactions, attempt to
                 // generate a fixed-size transaction.
                 auto gen_s = std::chrono::high_resolution_clock::now();
-                if(send_fixed) {
-                    tx = wallet.send_to(cfg.m_input_count,
-                                        cfg.m_output_count,
-                                        wallet.generate_key(),
-                                        true);
-                } else {
-                    // If using fixed TX mode, the fallback in/out count
-                    // should be 2/2
-                    if(cfg.m_fixed_tx_mode && cfg.m_fixed_tx_rate > 0.0) {
-                        continue;
-                    } else {
+                tx = wallet.send_to(cfg.m_input_count,
+                                    cfg.m_output_count,
+                                    wallet.generate_key(),
+                                    true);
                         // Otherwise send a regular transaction and let the
                         // wallet determine the input/output count.
-                        tx = wallet.send_to(send_amt,
-                                            wallet.generate_key(),
-                                            true);
-                    }
-                }
                 auto gen_e = std::chrono::high_resolution_clock::now();
                 auto gen_t = gen_e - gen_s;
                 static constexpr auto average_factor = 0.1;
                 gen_avg = static_cast<uint64_t>(
                     (static_cast<double>(gen_t.count()) * average_factor)
                     + (static_cast<double>(gen_avg) * (1.0 - average_factor)));
+            } else if(!tx && !(cfg.m_fixed_tx_mode && cfg.m_fixed_tx_rate > 0.0)) {
+                tx = wallet.send_to(send_amt,
+                                    wallet.generate_key(),
+                                    true);
             } else {
                 std::this_thread::sleep_for(std::chrono::nanoseconds(gen_avg));
             }
