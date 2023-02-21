@@ -7,7 +7,7 @@ on:
   push:
     branches:
       - trunk
-
+      - platform-support
 defaults:
   run:
     shell: bash
@@ -18,7 +18,10 @@ env:
 jobs:
   build-release:
     name: Build Release Candidate
-    runs-on: ubuntu-20.04
+    strategy:
+        matrix: 
+            os: [ubuntu-20.04, macos-latest]
+    runs-on: ${{ matrix.os }}
     env:
       BUILD_RELEASE: 1
     steps:
