@@ -183,6 +183,8 @@ namespace cbdc::parsec {
                 cfg.m_runner_type = runner_type::evm;
             } else if(val == "lua") {
                 cfg.m_runner_type = runner_type::lua;
+            } else if(val == "py") {
+                cfg.m_runner_type = runner_type::py;
             } else {
                 return std::nullopt;
             }

@@ -14,6 +14,7 @@
 #include "runners/evm/messages.hpp"
 #include "runners/evm/util.hpp"
 #include "runners/lua/server.hpp"
+#include "runners/py/py_server.hpp"
 #include "runtime_locking_shard/client.hpp"
 #include "ticket_machine/client.hpp"
 #include "util.hpp"
@@ -138,6 +139,16 @@ auto main(int argc, char** argv) -> int {
             cfg->m_agent_endpoints[cfg->m_component_id],
             true);
         server = std::make_unique<cbdc::parsec::agent::rpc::http_server>(
+            std::move(rpc_server),
+            broker,
+            log,
+            cfg.value());
+    } else if(cfg->m_runner_type == cbdc::parsec::runner_type::py) {
+        auto rpc_server = std::make_unique<
+            cbdc::rpc::async_tcp_server<cbdc::parsec::agent::rpc::request,
+                                        cbdc::parsec::agent::rpc::response>>(
+            cfg->m_agent_endpoints[cfg->m_component_id]);
+        server = std::make_unique<cbdc::parsec::agent::rpc::py_server>(
             std::move(rpc_server),
             broker,
             log,

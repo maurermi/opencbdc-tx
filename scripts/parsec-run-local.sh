@@ -24,6 +24,8 @@ for arg in "$@"; do
     elif [[ "$arg" == "--runner_type"* ]]; then
         if [[ "$arg" == "--runner_type=lua" ]]; then
             RUNNER_TYPE="lua"
+        elif [[ "$arg" == "--runner_type=py" ]]; then
+            RUNNER_TYPE="py"
         elif [[ "$arg" != "--runner_type=evm" ]]; then
             echo "unknown runner type, using evm"
         fi

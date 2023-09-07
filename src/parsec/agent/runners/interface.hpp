@@ -118,6 +118,7 @@ namespace cbdc::parsec::agent::runner {
 
         friend class lua_runner;
         friend class evm_runner;
+        friend class py_runner;
 
       private:
         std::shared_ptr<logging::log> m_log;

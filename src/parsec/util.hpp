@@ -25,6 +25,8 @@ namespace cbdc::parsec {
         lua,
         /// Ethereum-style transactions using EVM.
         evm,
+        /// Python Script using CPython
+        py,
     };
 
     /// Configuration parameters for a phase two system.

@@ -43,6 +43,7 @@ find_library(EVMONE_LIBRARY evmone REQUIRED)
 find_library(JSON_LIBRARY libjsoncpp.a jsoncpp REQUIRED)
 find_library(CURL_LIBRARY libcurl.a curl REQUIRED)
 find_library(MHD_LIBRARY libmicrohttpd.a REQUIRED)
+find_package(Python REQUIRED)
 
 set(LUA_LIBRARY "${LUA_LIBRARY}" "-ldl")
 

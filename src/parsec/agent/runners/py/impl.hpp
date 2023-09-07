@@ -3,25 +3,21 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef OPENCBDC_TX_SRC_PARSEC_AGENT_LUA_RUNNER_H_
-#define OPENCBDC_TX_SRC_PARSEC_AGENT_LUA_RUNNER_H_
+#ifndef OPENCBDC_TX_SRC_PARSEC_AGENT_PY_RUNNER_H_
+#define OPENCBDC_TX_SRC_PARSEC_AGENT_PY_RUNNER_H_
 
 #include "parsec/agent/runners/interface.hpp"
 #include "parsec/util.hpp"
 
-#include <lua.hpp>
+#include <Python.h>
 #include <memory>
 
 namespace cbdc::parsec::agent::runner {
-    /// Lua function executor. Provides an environment for contracts to execute
-    /// in. Manages retrieval of function bytecode, locking keys during
-    /// function execution, signature checking and commiting execution results.
-    /// Class cannot be re-used for different functions/transactions, manages
-    /// the lifecycle of a single transaction.
-    class lua_runner : public interface {
+    /// Py function executor. Provides an environment for contracts to execute
+    class py_runner : public interface {
       public:
         /// \copydoc interface::interface()
-        lua_runner(std::shared_ptr<logging::log> logger,
+        py_runner(std::shared_ptr<logging::log> logger,
                    const cbdc::parsec::config& cfg,
                    runtime_locking_shard::value_type function,
                    parameter_type param,
@@ -41,7 +37,7 @@ namespace cbdc::parsec::agent::runner {
         static constexpr auto initial_lock_type = broker::lock_type::read;
 
       private:
-        std::shared_ptr<lua_State> m_state;
+        int m_state; // should reflect state (may not need)
 
         void contract_epilogue(int n_results);
 
@@ -52,7 +48,7 @@ namespace cbdc::parsec::agent::runner {
         void
         handle_try_lock(const broker::interface::try_lock_return_type& res);
 
-        static auto check_sig(lua_State* L) -> int;
+        //static auto check_sig(lua_State* L) -> int;
     };
 }
 
