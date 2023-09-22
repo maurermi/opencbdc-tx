@@ -106,7 +106,7 @@ $ npx hardhat console
 
 > const signers = await ethers.getSigners()
 undefined
-> await signers[0].sendTransaction({to:"0x08293b196E8F1c5552e455CFD10B642EC7a809A7", value:ethers.toBeHex(ethers.parseUnits("500.99"))});
+> await signers[0].sendTransaction({to:"0x08293b196E8F1c5552e455CFD10B642EC7a809A7", value:ethers.utils.parseEther("500.99")});
 {
     ...
 }
