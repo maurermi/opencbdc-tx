@@ -45,16 +45,25 @@ namespace cbdc::parsec::agent::runner {
         m_log->info("calling run");
         Py_Initialize();
 
+        // to pass in args, use Py_BuildValue() to build string
+
         m_log->trace(m_function.c_str());
-        auto r = PyRun_SimpleString(m_function.c_str());
+        PyObject* main = PyImport_AddModule("__main__");
+        PyObject* globalDictionary = PyModule_GetDict(main);
+        PyObject* localDictionary = PyDict_New();
+        PyObject* value = PyUnicode_FromString(m_param.c_str());
+        PyDict_SetItemString(localDictionary, "website", value);
+        // passing arguments
+        auto r = PyRun_String(m_function.c_str(), Py_file_input, globalDictionary, localDictionary);
         if(r) {
+            m_log->error("R = ", r);
             m_log->error("PyRun had error");
         }
         if(Py_FinalizeEx() < 0) {
             m_log->fatal("Py not finalized correctly");
         }
 
-        //schedule_contract();
+        // schedule_contract();
 
         return true;
     }
@@ -84,7 +93,8 @@ namespace cbdc::parsec::agent::runner {
 
     // void py_runner::schedule_contract() {
     //     //int n_results{};
-    //     contract_epilogue(0);
+
+    //     //contract_epilogue(0);
     // }
 
     // void py_runner::handle_try_lock(
@@ -102,7 +112,8 @@ namespace cbdc::parsec::agent::runner {
     //                    [&](const runtime_locking_shard::shard_error& e)
     //                        -> std::optional<error_code> {
     //                        if(e.m_error_code
-    //                           == runtime_locking_shard::error_code::wounded) {
+    //                           == runtime_locking_shard::error_code::wounded)
+    //                           {
     //                            return error_code::wounded;
     //                        }
     //                        m_log->error("Shard error acquiring lock");

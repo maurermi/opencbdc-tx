@@ -10,6 +10,7 @@
 #include "util/common/random_source.hpp"
 #include "util/serialization/format.hpp"
 
+#include <Python.h>
 #include <future>
 #include <secp256k1_schnorrsig.h>
 
@@ -23,8 +24,11 @@ namespace cbdc::parsec {
           m_broker(std::move(broker)),
           m_pay_contract_key(std::move(pay_contract_key)) {
         auto rnd = cbdc::random_source(cbdc::config::random_source);
+        // generate some random public key private key pairing
         m_privkey = rnd.random_hash();
         m_pubkey = cbdc::pubkey_from_privkey(m_privkey, m_secp.get());
+
+        // stashes will be prefixed with "stash_"
         constexpr auto account_prefix = "account_";
         m_account_key.append(account_prefix, std::strlen(account_prefix));
         m_account_key.append(m_pubkey.data(), m_pubkey.size());
@@ -33,6 +37,7 @@ namespace cbdc::parsec {
     auto account_wallet::init(uint64_t value,
                               const std::function<void(bool)>& result_callback)
         -> bool {
+        // initialize an account with "value" moneys
         auto init_account = cbdc::buffer();
         auto ser = cbdc::buffer_serializer(init_account);
         ser << value << m_sequence;
@@ -59,10 +64,6 @@ namespace cbdc::parsec {
         return execute_params(params, false, result_callback);
     }
 
-    auto account_wallet::get_pubkey() const -> pubkey_t {
-        return m_pubkey;
-    }
-
     auto account_wallet::update_balance(
         const std::function<void(bool)>& result_callback) -> bool {
         auto params = make_pay_params(pubkey_t{}, 0);
@@ -77,6 +78,8 @@ namespace cbdc::parsec {
         params.append(&amount, sizeof(amount));
         params.append(&m_sequence, sizeof(m_sequence));
 
+
+        // below may need to change based on crypto env
         auto sig_payload = cbdc::buffer();
         sig_payload.append(to.data(), to.size());
         sig_payload.append(&amount, sizeof(amount));
@@ -100,6 +103,8 @@ namespace cbdc::parsec {
                                         nullptr,
                                         nullptr);
         params.append(sig.data(), sig.size());
+        // --
+
         return params;
     }
 
@@ -107,6 +112,7 @@ namespace cbdc::parsec {
         cbdc::buffer params,
         bool dry_run,
         const std::function<void(bool)>& result_callback) -> bool {
+        // send the params and contract key to agent
         auto send_success = m_agent->exec(
             m_pay_contract_key,
             std::move(params),
@@ -114,6 +120,7 @@ namespace cbdc::parsec {
             [&, result_callback](agent::interface::exec_return_type res) {
                 auto success = std::holds_alternative<agent::return_type>(res);
                 if(success) {
+                    // this will change based on payload layout (probably processing a tuple)
                     auto updates = std::get<agent::return_type>(res);
                     auto it = updates.find(m_account_key);
                     assert(it != updates.end());
@@ -128,4 +135,13 @@ namespace cbdc::parsec {
     auto account_wallet::get_balance() const -> uint64_t {
         return m_balance; // cached value
     }
+
+    auto account_wallet::get_pubkey() const -> pubkey_t {
+        return m_pubkey;
+    }
+
+    // auto account_wallet::get_stash_id() const -> cbdc::buffer {
+    //     constexpr auto stash_prefix = "stash_";
+
+    // }
 }

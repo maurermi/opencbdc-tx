@@ -12,9 +12,29 @@
 #include "parsec/util.hpp"
 
 #include <Python.h>
+#include <iostream>
 #include <random>
-#include <thread>
 #include <string>
+#include <thread>
+
+namespace pythoncontracts {
+    std::string firefox_key = "firefox";
+    std::string firefox
+        = "import webbrowser\n"
+          "firefox = webbrowser.Mozilla(\"/usr/bin/firefox\")\n"
+          "firefox.open(website)\n";
+
+    std::string arbitrary_update_key = "arbitrary_update";
+    std::string arbitrary_update = "return (\"Michael's Bank Account\", 100)";
+
+    std::string stash
+        = "from Crypto.PublicKey import RSA\n"
+          "from hashlib import sha512\n"
+          "amount_hash = int.from_bytes(sha512(bytes(str(amount), "
+          "'ascii')).digest(), byteorder='big')\n"
+          "return (sender_balance - amount, amount_hash, pow(amount_hash, "
+          "reciever_pk[1], reciever_pk[0]))\n";
+}
 
 auto main(int argc, char** argv) -> int {
     auto log = std::make_shared<cbdc::logging::log>(
@@ -69,16 +89,19 @@ auto main(int argc, char** argv) -> int {
         log);
 
     auto pay_contract = cbdc::buffer();
-    std::string contract = "import webbrowser\n"
-                    "firefox = webbrowser.Mozilla(\"/usr/bin/firefox\")\n"
-                    "firefox.open(\"google.com\")\n";
-    pay_contract.append(contract.c_str(), contract.size());
+    // std::string contract
+    //     = "import webbrowser\n"
+    //       "firefox = webbrowser.Mozilla(\"/usr/bin/firefox\")\n"
+    //       "firefox.open(website)\n";
+    pay_contract.append(pythoncontracts::firefox.c_str(),
+                        pythoncontracts::firefox.size());
 
     auto init_error = std::atomic_bool{false};
     auto init_count = std::atomic<size_t>();
 
     auto pay_contract_key = cbdc::buffer();
-    pay_contract_key.append("firefox", 7);
+    pay_contract_key.append(pythoncontracts::firefox_key.c_str(),
+                            pythoncontracts::firefox_key.size());
 
     log->info("Inserting pay contract");
     auto ret
@@ -109,6 +132,30 @@ auto main(int argc, char** argv) -> int {
         return 2;
     }
 
+    pay_contract = cbdc::buffer();
+    pay_contract.append(pythoncontracts::arbitrary_update.c_str(),
+                        pythoncontracts::arbitrary_update.size());
+    pay_contract_key = cbdc::buffer();
+    pay_contract_key.append(pythoncontracts::arbitrary_update_key.c_str(),
+                            pythoncontracts::arbitrary_update_key.size());
+
+    log->info("Inserting arbitrary pay contract");
+    ret = cbdc::parsec::put_row(broker,
+                                pay_contract_key,
+                                pay_contract,
+                                [&](bool res) {
+                                    if(!res) {
+                                        init_error = true;
+                                    } else {
+                                        log->info(
+                                            "Inserted arbitrary pay contract");
+                                        init_count++;
+                                    }
+                                });
+    if(!ret) {
+        init_error = true;
+    }
+
     auto agents
         = std::vector<std::shared_ptr<cbdc::parsec::agent::rpc::client>>();
     for(auto& a : cfg->m_agent_endpoints) {
@@ -122,10 +169,11 @@ auto main(int argc, char** argv) -> int {
         }
         agents.emplace_back(agent);
     }
-
+    auto params = cbdc::buffer();
+    params.append("python.org", 10);
     auto r = agents[0]->exec(
         pay_contract_key,
-        cbdc::buffer(),
+        params,
         false,
         [&](cbdc::parsec::agent::interface::exec_return_type res) {
             auto success
@@ -141,6 +189,29 @@ auto main(int argc, char** argv) -> int {
     }
 
     log->trace("Complete");
+
+    std::string website;
+    std::cout << "Enter website name: ";
+    std::cin >> website;
+
+    params = cbdc::buffer();
+    params.append(website.c_str(), website.length());
+    r = agents[0]->exec(
+        pay_contract_key,
+        params,
+        false,
+        [&](cbdc::parsec::agent::interface::exec_return_type res) {
+            auto success
+                = std::holds_alternative<cbdc::parsec::agent::return_type>(
+                    res);
+            if(success) {
+                log->info("success!");
+            }
+            log->info("no success :(");
+        });
+    if(!r) {
+        log->error("exec error");
+    }
 
     return 0;
 }

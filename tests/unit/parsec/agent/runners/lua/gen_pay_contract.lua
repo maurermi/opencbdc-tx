@@ -10,7 +10,7 @@ function gen_bytecode()
 
         function get_account(name)
             account_key = get_account_key(name)
-            account_data = coroutine.yield(account_key)
+            account_data = coroutine.yield(account_key) -- get the data associated with the key
             if string.len(account_data) > 0 then
                 account_balance, account_sequence
                 = string.unpack("I8 I8", account_data)

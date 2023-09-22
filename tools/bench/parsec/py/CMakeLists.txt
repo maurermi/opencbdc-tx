@@ -1,4 +1,4 @@
-add_executable(py_bench py_bench.cpp)
+add_executable(py_bench py_bench.cpp) #wallet.cpp py_bench.cpp)
 target_link_libraries(py_bench  broker
                                 directory
                                 runtime_locking_shard

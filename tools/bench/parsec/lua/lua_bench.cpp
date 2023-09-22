@@ -18,7 +18,7 @@
 
 auto main(int argc, char** argv) -> int {
     auto log
-        = std::make_shared<cbdc::logging::log>(cbdc::logging::log_level::warn);
+        = std::make_shared<cbdc::logging::log>(cbdc::logging::log_level::trace);
 
     auto sha2_impl = SHA256AutoDetect();
     log->info("using sha2: ", sha2_impl);
@@ -116,7 +116,7 @@ auto main(int argc, char** argv) -> int {
         }
     }
 
-    constexpr uint64_t timeout = 300;
+    constexpr uint64_t timeout = 30;
     constexpr auto wait_time = std::chrono::seconds(1);
     for(size_t count = 0;
         init_count < n_wallets && !init_error && count < timeout;
@@ -249,7 +249,7 @@ auto main(int argc, char** argv) -> int {
     }
 
     auto start_time = std::chrono::high_resolution_clock::now();
-    constexpr auto test_duration = std::chrono::minutes(5);
+    constexpr auto test_duration = std::chrono::minutes(1);
     while(in_flight > 0 || running) {
         auto now = std::chrono::high_resolution_clock::now();
         uint64_t now_count = now.time_since_epoch().count();
