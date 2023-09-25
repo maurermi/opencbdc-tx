@@ -411,6 +411,7 @@ namespace cbdc::parsec::agent::rpc {
     auto http_server::handle_get_balance(
         Json::Value params,
         const server_type::result_callback_type& callback) -> bool {
+        m_log->trace("in handle get balance");
         if(!params.isArray() || params.empty() || !params[0].isString()) {
             m_log->warn("Invalid parameters to getBalance");
             return false;
@@ -429,11 +430,13 @@ namespace cbdc::parsec::agent::rpc {
             runner::evm_runner_function::read_account,
             runner_params,
             true,
-            [callback, runner_params](interface::exec_return_type res) {
+            [&, callback, runner_params](interface::exec_return_type res) {
                 auto ret = Json::Value();
                 auto& updates = std::get<return_type>(res);
                 auto it = updates.find(runner_params);
+
                 if(it == updates.end() || it->second.size() == 0) {
+                    m_log->trace("balnce requested for non existent account");
                     // Return 0 for non-existent accounts
                     ret["result"] = "0x0";
                     callback(ret);
@@ -443,6 +446,7 @@ namespace cbdc::parsec::agent::rpc {
                 auto maybe_acc
                     = cbdc::from_buffer<runner::evm_account>(it->second);
                 if(!maybe_acc.has_value()) {
+                    m_log->trace("balnce requested for account with no value");
                     ret["error"] = Json::Value();
                     ret["error"]["code"] = error_code::internal_error;
                     ret["error"]["message"] = "Internal error";
@@ -451,6 +455,7 @@ namespace cbdc::parsec::agent::rpc {
                 }
 
                 auto& acc = maybe_acc.value();
+                m_log->trace("balnce requested for account");
                 ret["result"] = to_hex_trimmed(acc.m_balance);
                 callback(ret);
             });

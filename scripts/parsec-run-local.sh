@@ -3,7 +3,7 @@
 IP="localhost"
 PORT="8888"
 RUNNER_TYPE="evm"
-LOGLEVEL="WARN"
+LOGLEVEL="TRACE"
 
 function print_help() {
     echo "Usage: parsec-run-local.sh [OPTIONS]"
@@ -26,8 +26,11 @@ for arg in "$@"; do
             RUNNER_TYPE="lua"
         elif [[ "$arg" == "--runner_type=py" ]]; then
             RUNNER_TYPE="py"
+        elif [[ "$arg" == "--runner_type=evm" ]]; then
+            RUNNER_TYPE="evm"
         elif [[ "$arg" != "--runner_type=evm" ]]; then
-            echo "unknown runner type, using evm"
+            echo "unknown runner type, using "
+            echo $RUNNER_TYPE
         fi
     elif [[ "$arg" == "--ip"* ]]; then
         IP="${arg#--ip=}"
@@ -56,10 +59,16 @@ sleep 1
     --component_id=0 --agent_count=1 --agent0_endpoint=$IP:6666 \
     --ticket_machine_count=1 --ticket_machine0_endpoint=$IP:7777 \
     --loglevel=$LOGLEVEL > logs/ticket_machined.log &
-sleep 1
+sleep 5
+#rr ./build/src/parsec/agent/agentd --shard_count=1 \
+#   --shard0_count=1 --shard00_endpoint=$IP:5556 --node_id=0 --component_id=0 \
+#   --agent_count=1 --agent0_endpoint=$IP:$PORT --ticket_machine_count=1 \
+#   --ticket_machine0_endpoint=$IP:7777 --loglevel=$LOGLEVEL \
+#   --runner_type=$RUNNER_TYPE > logs/agentd.log &
 ./scripts/wait-for-it.sh -s $IP:7777 -t 60 -- ./scripts/wait-for-it.sh -s \
-    $IP:5556 -t 60 -- ./build/src/parsec/agent/agentd --shard_count=1 \
+    $IP:5556 -t 60 -- rr ./build/src/parsec/agent/agentd --shard_count=1 \
     --shard0_count=1 --shard00_endpoint=$IP:5556 --node_id=0 --component_id=0 \
     --agent_count=1 --agent0_endpoint=$IP:$PORT --ticket_machine_count=1 \
     --ticket_machine0_endpoint=$IP:7777 --loglevel=$LOGLEVEL \
     --runner_type=$RUNNER_TYPE > logs/agentd.log &
+echo spawned

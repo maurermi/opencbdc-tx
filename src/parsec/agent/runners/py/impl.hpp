@@ -39,16 +39,20 @@ namespace cbdc::parsec::agent::runner {
       private:
         int m_state; // should reflect state (may not need)
 
-        void contract_epilogue(int n_results);
+        //void update_state();
+        void update_state(PyObject* localDictionary);
 
-        auto get_stack_string(int index) -> std::optional<buffer>;
+        auto parse_params() -> std::vector<std::string>;
 
-        void schedule_contract();
+        // void contract_epilogue(int n_results);
+
+        // auto get_stack_string(int index) -> std::optional<buffer>;
+
+        // void schedule_contract();
 
         void
         handle_try_lock(const broker::interface::try_lock_return_type& res);
 
-        //static auto check_sig(lua_State* L) -> int;
     };
 }
 

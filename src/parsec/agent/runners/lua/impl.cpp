@@ -154,6 +154,7 @@ namespace cbdc::parsec::agent::runner {
                 return;
             }
             lua_pop(m_state.get(), n_results);
+            m_log->trace("key_buf = ", key_buf.value().c_str());
             auto success
                 = m_try_lock_callback(std::move(key_buf.value()),
                                       broker::lock_type::write,
