@@ -58,6 +58,7 @@ namespace cbdc::parsec::agent::runner {
         //       methods
         luaL_openlibs(m_state.get());
 
+        // puts function in lua env
         lua_register(m_state.get(), "check_sig", &lua_runner::check_sig); // register this function in lua env
 
         static constexpr auto function_name = "contract";

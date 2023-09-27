@@ -18,13 +18,20 @@
 #include <thread>
 
 namespace pythoncontracts {
+    /*
+    , = delimiter between values
+    | = delimiter between header region
+    return_types | return_args | input_args | function
+    */
+
     std::string firefox_key = "firefox";
     std::string firefox
-        = "import webbrowser\n"
+        = "s|website1,|website1,website2,|import webbrowser\n"
           "firefox = webbrowser.Mozilla(\"/usr/bin/firefox\")\n"
           "firefox.open(website1)\n"
           "print(website2)\n"
-          "firefox.open(website2)\n";
+          "firefox.open(website2)\n"
+          "website1 = (\"github.com\")";
 
     std::string arbitrary_update_key = "arbitrary_update";
     std::string arbitrary_update
@@ -181,65 +188,12 @@ auto main(int argc, char** argv) -> int {
     }
     auto params = cbdc::buffer();
 
-    std::string website = "google.com";
+    std::string website = "bing.com";
     // std::cout << "Enter website name: ";
     // std::cin >> website;
 
-    // params.append(website.c_str(), website.length() + 1);
-    // params.append("python.org\0", 11);
-    // auto r = agents[0]->exec(
-    //     pay_contract_key,
-    //     params,
-    //     false,
-    //     [&](cbdc::parsec::agent::interface::exec_return_type res) {
-    //         auto success
-    //             = std::holds_alternative<cbdc::parsec::agent::return_type>(
-    //                 res);
-    //         if(success) {
-    //             log->info("success!");
-    //         }
-    //         log->info("no success :(");
-    //     });
-    // if(!r) {
-    //     log->error("exec error");
-    // }
-
-    params = cbdc::buffer();
-    pay_contract = cbdc::buffer();
-    pay_contract.append(pythoncontracts::arbitrary_update.c_str(),
-                        pythoncontracts::arbitrary_update.size());
-    pay_contract_key = cbdc::buffer();
-    pay_contract_key.append(pythoncontracts::arbitrary_update_key.c_str(),
-                            pythoncontracts::arbitrary_update_key.size());
-    log->info(pythoncontracts::arbitrary_update.c_str());
-    log->info(pythoncontracts::arbitrary_update_key.c_str());
-    log->info("Inserting arbitrary pay contract");
-    ret = cbdc::parsec::put_row(broker,
-                                pay_contract_key,
-                                pay_contract,
-                                [&](bool res) {
-                                    if(!res) {
-                                        init_error = true;
-                                    } else {
-                                        log->info(
-                                            "Inserted arbitrary pay contract");
-                                        init_count++;
-                                    }
-                                });
-    if(!ret) {
-        init_error = true;
-        log->error("init error");
-    }
-    for(size_t count = 0; init_count < 1 && !init_error && count < timeout;
-        count++) {
-        std::this_thread::sleep_for(wait_time);
-    }
-    if(init_error || init_count < 1) {
-        log->error("Error adding pay contract");
-        return 2;
-    }
-
-    log->info("calling exec");
+    params.append(website.c_str(), website.length() + 1);
+    params.append("python.org\0", 11);
     auto r = agents[0]->exec(
         pay_contract_key,
         params,
@@ -248,22 +202,75 @@ auto main(int argc, char** argv) -> int {
             auto success
                 = std::holds_alternative<cbdc::parsec::agent::return_type>(
                     res);
-            log->trace("measuring success");
             if(success) {
-                auto updates = std::get<cbdc::parsec::agent::return_type>(res);
-                auto buf = cbdc::buffer();
-                buf.append("0x3B2F51dad57e4160fd51DdB9A502c320B3f6363f", 43);
-                auto it = updates.find(buf);
-                log->trace("finding");
-                assert(it != updates.end());
-                log->trace("success 238");
-            } else {
-                log->trace("error");
+                log->info("success!");
             }
+            log->info("no success :(");
         });
     if(!r) {
         log->error("exec error");
     }
+
+    // params = cbdc::buffer();
+    // pay_contract = cbdc::buffer();
+    // pay_contract.append(pythoncontracts::arbitrary_update.c_str(),
+    //                     pythoncontracts::arbitrary_update.size());
+    // pay_contract_key = cbdc::buffer();
+    // pay_contract_key.append(pythoncontracts::arbitrary_update_key.c_str(),
+    //                         pythoncontracts::arbitrary_update_key.size());
+    // log->info(pythoncontracts::arbitrary_update.c_str());
+    // log->info(pythoncontracts::arbitrary_update_key.c_str());
+    // log->info("Inserting arbitrary pay contract");
+    // ret = cbdc::parsec::put_row(broker,
+    //                             pay_contract_key,
+    //                             pay_contract,
+    //                             [&](bool res) {
+    //                                 if(!res) {
+    //                                     init_error = true;
+    //                                 } else {
+    //                                     log->info(
+    //                                         "Inserted arbitrary pay contract");
+    //                                     init_count++;
+    //                                 }
+    //                             });
+    // if(!ret) {
+    //     init_error = true;
+    //     log->error("init error");
+    // }
+    // for(size_t count = 0; init_count < 1 && !init_error && count < timeout;
+    //     count++) {
+    //     std::this_thread::sleep_for(wait_time);
+    // }
+    // if(init_error || init_count < 1) {
+    //     log->error("Error adding pay contract");
+    //     return 2;
+    // }
+
+    // log->info("calling exec");
+    // auto r = agents[0]->exec(
+    //     pay_contract_key,
+    //     params,
+    //     false,
+    //     [&](cbdc::parsec::agent::interface::exec_return_type res) {
+    //         auto success
+    //             = std::holds_alternative<cbdc::parsec::agent::return_type>(
+    //                 res);
+    //         log->trace("measuring success");
+    //         if(success) {
+    //             auto updates = std::get<cbdc::parsec::agent::return_type>(res);
+    //             auto buf = cbdc::buffer();
+    //             buf.append("0x3B2F51dad57e4160fd51DdB9A502c320B3f6363f", 43);
+    //             auto it = updates.find(buf);
+    //             log->trace("finding");
+    //             assert(it != updates.end());
+    //             log->trace("success 238");
+    //         } else {
+    //             log->trace("error");
+    //         }
+    //     });
+    // if(!r) {
+    //     log->error("exec error");
+    // }
 
     return 0;
 }

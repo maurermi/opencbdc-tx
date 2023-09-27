@@ -1,9 +1,10 @@
 #!/bin/bash
 
 IP="localhost"
-PORT="8888"
+PORT="8889"
 RUNNER_TYPE="evm"
 LOGLEVEL="TRACE"
+DBG=
 
 function print_help() {
     echo "Usage: parsec-run-local.sh [OPTIONS]"
@@ -46,7 +47,7 @@ echo Running agent on $IP:$PORT
 echo Log level = $LOGLEVEL
 echo Runner type = $RUNNER_TYPE
 
-./build/src/parsec/runtime_locking_shard/runtime_locking_shardd --shard_count=1 \
+$DBG ./build/src/parsec/runtime_locking_shard/runtime_locking_shardd --shard_count=1 \
     --shard0_count=1 --shard00_endpoint=$IP:5556 \
     --shard00_raft_endpoint=$IP:5557 --node_id=0 --component_id=0 \
     --agent_count=1 --agent0_endpoint=$IP:6666 --ticket_machine_count=1 \

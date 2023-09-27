@@ -120,6 +120,7 @@ namespace cbdc::parsec::agent::runner {
                 auto v = std::get<broker::value_type>(res);
                 auto ret = runtime_locking_shard::state_update_type();
                 ret[m_param] = v;
+                m_log->trace("evm broker returned AAAAAAAAAAAAAAA: value:", v.c_str());
                 m_result_callback(ret);
             });
     }

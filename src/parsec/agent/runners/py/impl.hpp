@@ -38,11 +38,19 @@ namespace cbdc::parsec::agent::runner {
 
       private:
         int m_state; // should reflect state (may not need)
+        std::vector<std::string> m_input_args;
+        std::vector<std::string> m_return_args;
+        //std::vector<std::string> m_return_types;
+        std::string m_return_types;
 
         //void update_state();
         void update_state(PyObject* localDictionary);
 
+
+        // only creating both because ostensibly m_param and m_function
+        // can be different data types
         auto parse_params() -> std::vector<std::string>;
+        void parse_header();
 
         // void contract_epilogue(int n_results);
 

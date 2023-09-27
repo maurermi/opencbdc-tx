@@ -47,35 +47,62 @@ namespace cbdc::parsec::agent::runner {
 
         // to pass in args, use Py_BuildValue() to build string
 
+        /*
+            Next Step:
+            Define a way for functions to have signatures
+                Specifically, what are the output(s) of the function
+                and their types.
+        */
+
         // m_log->trace(m_function.c_str());
         PyObject* main = PyImport_AddModule("__main__");
         PyObject* globalDictionary = PyModule_GetDict(main);
         PyObject* localDictionary = PyDict_New();
-        std::vector<std::string> args;
+        parse_header();
+        auto params = parse_params();
+        // Need to determine a scheme to create a list of argument names with
+        // values store each function as {n_args, arg_names, function_script}
         // args.push_back("website1");
         // args.push_back("website2");
-        // auto params = parse_params();
+
+        // int argc = std::stoi(params[0]);
+
         // m_log->trace("param count: ", params.size());
-        // for(unsigned long i = 0; i < params.size(); i++) {
-        //     PyObject* value = PyUnicode_FromString(params[i].c_str());
-        //     PyDict_SetItemString(localDictionary, args[i].c_str(), value);
-        // }
+        if(m_input_args.size() < params.size()) {
+            m_log->error("Too few arguments passed to function");
+            return true;
+        }
+        for(unsigned long i = 0; i < params.size(); i++) {
+            PyObject* value = PyUnicode_FromString(params[i].c_str());
+            PyDict_SetItemString(localDictionary,
+                                 m_input_args[i].c_str(),
+                                 value);
+        }
         // passing arguments
-        PyDict_SetItemString(localDictionary,
-                             "account",
-                             PyUnicode_FromString(""));
-        PyDict_SetItemString(localDictionary,
-                             "new_balance",
-                             PyLong_FromLong(0));
-        m_log->trace(m_function.c_str());
+        // PyDict_SetItemString(localDictionary,
+        //                      "account",
+        //                      PyUnicode_FromString(""));
+        // PyDict_SetItemString(localDictionary,
+        //                      "new_balance",
+        //                      PyLong_FromLong(0));
+        // m_log->trace(m_function.c_str());
         auto r = PyRun_String(m_function.c_str(),
                               Py_file_input,
                               globalDictionary,
                               localDictionary);
 
         // update_state();
-        update_state(localDictionary);
-        // schedule_contract();
+        long result;
+        auto res = PyDict_GetItemString(localDictionary, "website1");
+        if(!PyArg_ParseTuple(res, "l", result)) {
+            m_log->error("tuple could not be parsed");
+        }
+        else {
+            m_log->trace("Tuple parsed", result);
+        }
+
+        // update_state(localDictionary);
+        //  schedule_contract();
         if(r) {
             m_log->error("R = ", r);
             m_log->error("PyRun had error");
@@ -84,6 +111,49 @@ namespace cbdc::parsec::agent::runner {
             m_log->fatal("Py not finalized correctly");
         }
         return true;
+    }
+
+    void py_runner::parse_header() {
+        /* Assumes that header is return types | return args | input args |
+         * func */
+        auto charPtr = std::string((char*)m_function.data());
+
+        m_input_args.clear();
+        m_return_args.clear();
+        m_return_types.clear();
+        // need to delete the start of m_function
+
+        // parse the return types of the header
+        auto arg_delim = charPtr.find('|');
+        auto arg_string = charPtr.substr(0, arg_delim);
+        size_t pos = 0;
+        m_return_types = arg_string;
+        // while((pos = arg_string.find(",", 0)) != std::string::npos) {
+        //     m_return_types.push_back(arg_string.substr(0, pos));
+        //     arg_string.erase(0, pos + 1);
+        // }
+        charPtr.erase(0, arg_delim + 1);
+
+        arg_delim = charPtr.find('|');
+        arg_string = charPtr.substr(0, arg_delim);
+        pos = 0;
+        while((pos = arg_string.find(",", 0)) != std::string::npos) {
+            m_return_args.push_back(arg_string.substr(0, pos));
+            arg_string.erase(0, pos + 1);
+        }
+        charPtr.erase(0, arg_delim + 1);
+
+        arg_delim = charPtr.find('|');
+        arg_string = charPtr.substr(0, arg_delim);
+        pos = 0;
+        while((pos = arg_string.find(",", 0)) != std::string::npos) {
+            m_input_args.push_back(arg_string.substr(0, pos));
+            arg_string.erase(0, pos + 1);
+        }
+        charPtr.erase(0, arg_delim + 1);
+
+        m_function = cbdc::buffer();
+        m_function.append(charPtr.c_str(), charPtr.size());
     }
 
     auto py_runner::parse_params() -> std::vector<std::string> {
@@ -109,11 +179,18 @@ namespace cbdc::parsec::agent::runner {
         // else {
         //     m_log->error("NOT OK");
         // }
-        char *key;
+        char* key;
+        // for(std::string v : m_return_args) {
+        //     // determine type of arg then parse
+        //     auto ret_val = PyDict_GetItemString(localDictionary, v);
+        //     Py_TYPE(ret_val);
+        // }
         if(PyUnicode_Check(PyDict_GetItemString(localDictionary, "account"))) {
             m_log->trace("unicode check passed");
             key = PyBytes_AS_STRING(PyUnicode_AsEncodedString(
-                PyDict_GetItemString(localDictionary, "account"), "UTF-8", "strict"));
+                PyDict_GetItemString(localDictionary, "account"),
+                "UTF-8",
+                "strict"));
         } else {
             key = PyBytes_AsString(
                 PyDict_GetItemString(localDictionary, "account"));
@@ -121,9 +198,9 @@ namespace cbdc::parsec::agent::runner {
         auto value = PyLong_AsLong(
             PyDict_GetItemString(localDictionary, "new_balance"));
         auto key_buf = cbdc::buffer();
-        key_buf.append("3B2F51dad57e4160fd51DdB9A502c320B3f6363f", 41);
+        key_buf.append(key, strlen(key) + 1);
         auto value_buf = cbdc::buffer();
-        value_buf.append("100", 4);
+        value_buf.append(&value, 4);
         updates.emplace(key_buf,
                         std::move(value_buf)); // ought to use std::move
         m_log->trace("key:", key);
@@ -175,6 +252,7 @@ namespace cbdc::parsec::agent::runner {
         auto maybe_error = std::visit(
             overloaded{[&]([[maybe_unused]] const broker::value_type& v)
                            -> std::optional<error_code> {
+                           m_log->trace("broker return", v.c_str());
                            return std::nullopt;
                        },
                        [&](const broker::interface::error_code& /* e */)
