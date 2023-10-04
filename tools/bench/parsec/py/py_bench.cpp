@@ -31,7 +31,7 @@ namespace pythoncontracts {
           "firefox.open(website1)\n"
           "print(website2)\n"
           "firefox.open(website2)\n"
-          "website1 = (\"github.com\")";
+          "website1 = (100)";
 
     std::string arbitrary_update_key = "arbitrary_update";
     std::string arbitrary_update

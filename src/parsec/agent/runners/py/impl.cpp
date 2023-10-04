@@ -78,6 +78,8 @@ namespace cbdc::parsec::agent::runner {
                                  m_input_args[i].c_str(),
                                  value);
         }
+        // introduce a callback into C++ that can interact with shards
+
         // passing arguments
         // PyDict_SetItemString(localDictionary,
         //                      "account",
