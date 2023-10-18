@@ -73,6 +73,16 @@ namespace cbdc::parsec {
                  broker::key_type key,
                  broker::value_type value,
                  const std::function<void(bool)>& result_callback) -> bool;
+
+    /// Asynchronously get the row from the cluster.
+    /// \param broker broker to use for inserting the row.
+    /// \param key key at which to read.
+    /// \param result_callback function to call on fetch success or
+    ///                        failure.
+    /// \return true if request was initiated successfully.
+    auto get_row(const std::shared_ptr<broker::interface>& broker,
+                 broker::key_type key,
+                 const std::function<void(cbdc::parsec::broker::interface::try_lock_return_type)>& result_callback) -> bool;
 }
 
 #endif
