@@ -201,7 +201,8 @@ namespace cbdc::parsec {
                    begin_ret)) {
                 result_callback(false);
                 return;
-            }
+             }
+
             auto ticket_number
                 = std::get<cbdc::parsec::ticket_machine::ticket_number_type>(
                     begin_ret);
@@ -239,6 +240,68 @@ namespace cbdc::parsec {
                 });
             if(!lock_res) {
                 result_callback(false);
+                return;
+            }
+        });
+        return begin_res;
+    }
+
+    auto get_row(const std::shared_ptr<broker::interface>& broker,
+                 broker::key_type key,
+                 const std::function<void(cbdc::parsec::broker::interface::try_lock_return_type)>& result_callback) -> bool {
+        auto begin_res = broker->begin([=](auto begin_ret) {
+            if(!std::holds_alternative<
+                   cbdc::parsec::ticket_machine::ticket_number_type>(
+                   begin_ret)) {
+                result_callback(cbdc::parsec::broker::interface::error_code::ticket_number_assignment);
+                return;
+             }
+
+            auto ticket_number
+                = std::get<cbdc::parsec::ticket_machine::ticket_number_type>(
+                    begin_ret);
+            auto lock_res = broker->try_lock(
+                ticket_number,
+                key,
+                cbdc::parsec::runtime_locking_shard::lock_type::read,
+                [=](auto try_lock_res) {
+                    if(!std::holds_alternative<cbdc::buffer>(try_lock_res)) {
+                        result_callback(cbdc::parsec::broker::interface::error_code::shard_unreachable);
+                        return;
+                    }
+                    result_callback(try_lock_res);
+                    auto commit_res = broker->commit(
+                        ticket_number,
+                        runtime_locking_shard::state_update_type(),
+                        [=](auto commit_ret) {
+                            if(commit_ret.has_value()) {
+                                if(std::holds_alternative<cbdc::parsec::broker::interface::error_code>(commit_ret.value())) {
+                                    result_callback(std::get<cbdc::parsec::broker::interface::error_code>(commit_ret.value()));
+                                }
+                                else {
+                                    result_callback(std::get<cbdc::parsec::runtime_locking_shard::shard_error>(commit_ret.value()));
+                                }
+                                return;
+                            }
+                            auto finish_res = broker->finish(
+                                ticket_number,
+                                [=](auto finish_ret) {
+                                    if(finish_ret.has_value()) {
+                                        result_callback(finish_ret.value());
+                                    }
+                                });
+                            if(!finish_res) {
+                                result_callback(cbdc::parsec::broker::interface::error_code::finish_error);
+                                return;
+                            }
+                        });
+                    if(!commit_res) {
+                        result_callback(cbdc::parsec::broker::interface::error_code::commit_error);
+                        return;
+                    }
+                });
+            if(!lock_res) {
+                result_callback(cbdc::parsec::broker::interface::error_code::shard_unreachable);
                 return;
             }
         });
