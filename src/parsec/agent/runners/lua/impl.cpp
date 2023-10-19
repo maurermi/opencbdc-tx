@@ -87,6 +87,7 @@ namespace cbdc::parsec::agent::runner {
     }
 
     void lua_runner::contract_epilogue(int n_results) {
+        // m_result_callback is based off of the callback registered by server
         if(n_results != 1) {
             m_log->error("Contract returned more than one result");
             m_result_callback(error_code::result_count);
@@ -157,8 +158,8 @@ namespace cbdc::parsec::agent::runner {
             lua_pop(m_state.get(), n_results);
             m_log->trace("key_buf = ", key_buf.value().c_str());
             auto success
-                = m_try_lock_callback(std::move(key_buf.value()),
-                                      broker::lock_type::write,
+                = m_try_lock_callback(std::move(key_buf.value()), // try locking the key
+                                      broker::lock_type::write, // why is this always write ?
                                       [&](auto res) {
                                           handle_try_lock(std::move(res));
                                       });
@@ -177,6 +178,7 @@ namespace cbdc::parsec::agent::runner {
 
     void lua_runner::handle_try_lock(
         const broker::interface::try_lock_return_type& res) {
+        m_log->trace("Handle try lock...");
         auto maybe_error = std::visit(
             overloaded{
                 [&](const broker::value_type& v) -> std::optional<error_code> {

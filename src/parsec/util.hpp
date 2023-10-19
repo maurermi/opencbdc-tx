@@ -74,7 +74,7 @@ namespace cbdc::parsec {
                  broker::value_type value,
                  const std::function<void(bool)>& result_callback) -> bool;
 
-    /// Asynchronously get the row from the cluster.
+    /// Asynchronously get the value stored at key from the cluster.
     /// \param broker broker to use for inserting the row.
     /// \param key key at which to read.
     /// \param result_callback function to call on fetch success or

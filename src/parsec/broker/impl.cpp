@@ -105,7 +105,8 @@ namespace cbdc::parsec::broker {
                     k_it->second.m_value = v;
 
                     m_log->trace(this, "Broker locked key for", ticket_number);
-
+                    // m_log->trace(this, "Key:", key.c_str());
+                    // m_log->trace(this, "Returning:", v.c_str());
                     return v;
                 },
                 [&, key](parsec::runtime_locking_shard::shard_error e)
@@ -777,12 +778,28 @@ namespace cbdc::parsec::broker {
                 m_log->error("Failed to make try_lock shard request");
                 return error_code::shard_unreachable;
             }
+
             return std::nullopt;
         }();
 
         if(maybe_error.has_value()) {
+            // if(locktype == lock_type::read) {
+            //     // set ticket state to aborted
+            //     auto ticket = m_tickets.find(ticket_number);
+            //     if(ticket != m_tickets.end()) {
+            //         ticket->second->m_state = ticket_state::aborted;
+            //     }
+            // }
             result_callback(maybe_error.value());
         }
+        // // if read, set ticket state to committed
+        // if(locktype == lock_type::read) {
+        //     // set ticket state to aborted
+        //     auto ticket = m_tickets.find(ticket_number);
+        //     if(ticket != m_tickets.end()) { // this check is probably not required
+        //         ticket->second->m_state = ticket_state::committed;
+        //     }
+        // }
     }
 
     void impl::handle_finish(

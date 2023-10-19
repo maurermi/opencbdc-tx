@@ -31,7 +31,7 @@ namespace pythoncontracts {
           "firefox.open(website1)\n"
           "print(website2)\n"
           "firefox.open(website2)\n"
-          "website1 = (100)";
+          "website1 = 100";
 
     std::string arbitrary_update_key = "arbitrary_update";
     std::string arbitrary_update
@@ -127,13 +127,47 @@ auto main(int argc, char** argv) -> int {
                                     if(!res) {
                                         init_error = true;
                                     } else {
-                                        log->info("Inserted pay contract");
+                                        log->info("Inserted pay contract", pay_contract.c_str());
                                         init_count++;
                                     }
                                 });
     if(!ret) {
         init_error = true;
     }
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+
+    // std::string michael = "michael";
+    // auto k = cbdc::buffer();
+    // k.append(michael.c_str(), michael.size());
+    // auto v = cbdc::buffer();
+    // v.append("abcde", 5);
+    // auto f = cbdc::parsec::put_row(broker, k, v, [&](bool res) {
+    //     if(!res) {
+    //         log->info("Did not insert michael");
+    //     } else {
+    //         log->info("Inserted michael");
+    //     }
+    // });
+    // if(!f) {
+    //     init_error = true;
+    // }
+
+    // std::this_thread::sleep_for(std::chrono::seconds(10));
+
+    // auto return_value = cbdc::buffer();
+    // ret = cbdc::parsec::get_row(broker, k, [&](cbdc::parsec::broker::interface::try_lock_return_type res) {
+    //     if(std::holds_alternative<
+    //            cbdc::parsec::runtime_locking_shard::value_type>(res)) {
+    //         auto r = std::get<cbdc::parsec::runtime_locking_shard::value_type>(res);
+    //         log->trace("Found this (callback):", r.c_str());
+    //         return_value = r;
+    //     }
+    //     else {
+    //         log->error("get row callback recieved error");
+    //     }
+    // });
+    // std::this_thread::sleep_for(std::chrono::seconds(10));
+    // log->trace("Found this:", return_value.c_str());
 
     constexpr uint64_t timeout = 30;
 
@@ -146,7 +180,7 @@ auto main(int argc, char** argv) -> int {
         log->error("Error adding pay contract");
         return 2;
     }
-    init_count = 0;
+    // init_count = 0;
 
     // pay_contract = cbdc::buffer();
     // pay_contract.append(pythoncontracts::arbitrary_update.c_str(),
@@ -210,6 +244,27 @@ auto main(int argc, char** argv) -> int {
     if(!r) {
         log->error("exec error");
     }
+    // std::this_thread::sleep_for(std::chrono::seconds(20));
+    // log->trace("doing it again");
+    // r = agents[0]->exec(
+    //     pay_contract_key,
+    //     params,
+    //     false,
+    //     [&](cbdc::parsec::agent::interface::exec_return_type res) {
+    //         auto success
+    //             = std::holds_alternative<cbdc::parsec::agent::return_type>(
+    //                 res);
+    //         if(success) {
+    //             log->info("success!");
+    //         }
+    //         log->info("no success :(");
+    //     });
+    // if(!r) {
+    //     log->error("exec error");
+    // }
+    // cbdc::buffer result = get_value_at(michael);
+
+    // make some accounts
 
     // params = cbdc::buffer();
     // pay_contract = cbdc::buffer();
@@ -229,7 +284,8 @@ auto main(int argc, char** argv) -> int {
     //                                     init_error = true;
     //                                 } else {
     //                                     log->info(
-    //                                         "Inserted arbitrary pay contract");
+    //                                         "Inserted arbitrary pay
+    //                                         contract");
     //                                     init_count++;
     //                                 }
     //                             });
@@ -257,11 +313,11 @@ auto main(int argc, char** argv) -> int {
     //                 res);
     //         log->trace("measuring success");
     //         if(success) {
-    //             auto updates = std::get<cbdc::parsec::agent::return_type>(res);
-    //             auto buf = cbdc::buffer();
-    //             buf.append("0x3B2F51dad57e4160fd51DdB9A502c320B3f6363f", 43);
-    //             auto it = updates.find(buf);
-    //             log->trace("finding");
+    //             auto updates =
+    //             std::get<cbdc::parsec::agent::return_type>(res); auto buf =
+    //             cbdc::buffer();
+    //             buf.append("0x3B2F51dad57e4160fd51DdB9A502c320B3f6363f",
+    //             43); auto it = updates.find(buf); log->trace("finding");
     //             assert(it != updates.end());
     //             log->trace("success 238");
     //         } else {
@@ -271,6 +327,22 @@ auto main(int argc, char** argv) -> int {
     // if(!r) {
     //     log->error("exec error");
     // }
-
+    std::this_thread::sleep_for(std::chrono::seconds(15));
+    auto k = cbdc::buffer();
+    k.append("some key", 8);
+    auto return_value = cbdc::buffer();
+    ret = cbdc::parsec::get_row(broker, k, [&](cbdc::parsec::broker::interface::try_lock_return_type res) {
+        if(std::holds_alternative<
+               cbdc::parsec::runtime_locking_shard::value_type>(res)) {
+            auto cb_res = std::get<cbdc::parsec::runtime_locking_shard::value_type>(res);
+            log->trace("Found this (callback):", cb_res.c_str());
+            return_value = cb_res;
+        }
+        else {
+            log->error("get row callback recieved error");
+        }
+    });
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+    log->trace("Found this:", return_value.c_str());
     return 0;
 }

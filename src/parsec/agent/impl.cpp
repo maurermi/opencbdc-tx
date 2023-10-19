@@ -331,12 +331,12 @@ namespace cbdc::parsec::agent {
             get_param(),
             m_is_readonly_run,
             [this](const runner::interface::run_return_type& run_res) {
-                handle_run(run_res);
+                handle_run(run_res);                        // ----------------------------- RESULT CALLBACK
             },
             [this](broker::key_type key,
                    broker::lock_type locktype,
                    broker::interface::try_lock_callback_type res_cb) -> bool {
-                return do_try_lock_request(std::move(key),
+                return do_try_lock_request(std::move(key), // ------------------------------------------------- TRY LOCK CALLBACK
                                            locktype,
                                            std::move(res_cb));
             },

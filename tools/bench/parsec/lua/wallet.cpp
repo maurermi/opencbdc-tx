@@ -50,7 +50,7 @@ namespace cbdc::parsec {
 
     auto account_wallet::pay(pubkey_t to,
                              uint64_t amount,
-                             const std::function<void(bool)>& result_callback)
+                             const std::function<void(bool)>& result_callback) // 2
         -> bool {
         if(amount > m_balance) {
             return false;
@@ -120,7 +120,7 @@ namespace cbdc::parsec {
                     auto deser = cbdc::buffer_serializer(it->second);
                     deser >> m_balance >> m_sequence;
                 }
-                result_callback(success);
+                result_callback(success); // 1
             });
         return send_success;
     }

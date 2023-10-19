@@ -219,7 +219,7 @@ auto main(int argc, char** argv) -> int {
                 auto res = wallets[from].pay(
                     to_key,
                     1,
-                    [&, tx_start, from, to](bool ret) {
+                    [&, tx_start, from, to](bool ret) { // 3
                         if(!ret) {
                             log->fatal("Pay request error");
                         }

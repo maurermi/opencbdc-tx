@@ -76,7 +76,7 @@ namespace cbdc::rpc {
         auto async_call(InBuffer request_buf,
                         std::function<void(cbdc::buffer)> response_callback)
             -> std::optional<OutBuffer> {
-            if constexpr(!raw_mode) {
+            if constexpr(!raw_mode) { // if request is a buffer
                 auto req = server_type::deserialize_request(request_buf);
                 if(!req.has_value()) {
                     return std::nullopt;

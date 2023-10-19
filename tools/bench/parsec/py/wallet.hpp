@@ -68,8 +68,7 @@ namespace cbdc::parsec {
         // auto get_stash_id() const -> cbdc::buffer;
 
       private:
-        privkey_t m_privkey{};
-        pubkey_t m_pubkey{};
+        std::string m_pubkey{};
         uint64_t m_sequence{};
         uint64_t m_balance{};
         // bool m_is_account;

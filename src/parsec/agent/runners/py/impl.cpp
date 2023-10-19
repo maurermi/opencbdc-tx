@@ -12,6 +12,7 @@
 #include <cassert>
 #include <secp256k1.h>
 #include <secp256k1_schnorrsig.h>
+#include <thread>
 
 namespace cbdc::parsec::agent::runner {
     static const auto secp_context
@@ -43,6 +44,14 @@ namespace cbdc::parsec::agent::runner {
 
     auto py_runner::run() -> bool {
         m_log->info("calling run");
+
+        // std::string michael = "michael";
+        // auto k = cbdc::buffer();
+        // k.append(michael.c_str(), michael.size());
+        // auto res = cbdc::buffer();
+        // res.append("this is garbage", 16);
+        // get_value_at(k);
+        // m_log->trace("what we found", res.c_str());
         Py_Initialize();
 
         // to pass in args, use Py_BuildValue() to build string
@@ -58,6 +67,7 @@ namespace cbdc::parsec::agent::runner {
         PyObject* main = PyImport_AddModule("__main__");
         PyObject* globalDictionary = PyModule_GetDict(main);
         PyObject* localDictionary = PyDict_New();
+        //
         parse_header();
         auto params = parse_params();
         // Need to determine a scheme to create a list of argument names with
@@ -94,27 +104,55 @@ namespace cbdc::parsec::agent::runner {
                               localDictionary);
 
         // update_state();
-        long result;
-        auto res = PyDict_GetItemString(localDictionary, "website1");
-        if(!PyArg_ParseTuple(res, "l", result)) {
-            m_log->error("tuple could not be parsed");
-        }
-        else {
-            m_log->trace("Tuple parsed", result);
-        }
-
+        // long result;
+        // auto res = PyDict_GetItemString(localDictionary, "website1");
+        // if(!PyArg_ParseTuple(res, "l", result)) {
+        //     m_log->error("tuple could not be parsed");
+        // }
+        // else {
+        //     m_log->trace("Tuple parsed", result);
+        // }
+        auto value
+            = PyLong_AsLong(PyDict_GetItemString(localDictionary, "website1"));
+        m_log->trace("Website1 = ", value);
         // update_state(localDictionary);
         //  schedule_contract();
-        if(r) {
+        if(!r) {
             m_log->error("R = ", r);
             m_log->error("PyRun had error");
         }
         if(Py_FinalizeEx() < 0) {
             m_log->fatal("Py not finalized correctly");
         }
+
+        // m_result_callback(error_code::exec_error); // REALLY SHOULD CALL THE
+        //  CALLBACK SOMEWHERE!
+
+        // m_result_callback(error_code::exec_error);
+        // m_log->info("calling run");
+
+        // get_value_at(k);
+        // res = cbdc::buffer();
+        // res.append("this is garbage", 16);
+        // if(m_return_values.size() > 0) {
+        //     res = m_return_values[0];
+        // }
+        // m_log->trace("what we found", res.c_str());
+
+        // call m_result_callback with "state update type" or error code
+        auto results = runtime_locking_shard::state_update_type();
+        auto key_buf = cbdc::buffer();
+        auto value_buf = cbdc::buffer();
+        key_buf.append("some key", 8);
+        value_buf.append("some value", 10);
+        results.emplace(std::move(key_buf),
+                        std::move(value_buf));
+        m_result_callback(std::move(results));
+
         return true;
     }
 
+    // fills m_input_args, m_return_args, m_return_types
     void py_runner::parse_header() {
         /* Assumes that header is return types | return args | input args |
          * func */
@@ -210,7 +248,7 @@ namespace cbdc::parsec::agent::runner {
         auto success = m_try_lock_callback(key_buf, // ought to use std::move
                                            broker::lock_type::write,
                                            [&](auto res) {
-                                               handle_try_lock(std::move(res));
+                                               handle_try_lock(res);
                                            });
         if(!success) {
             m_log->error("Failed to issue try lock command");
@@ -220,41 +258,46 @@ namespace cbdc::parsec::agent::runner {
         m_result_callback(std::move(updates));
     }
 
-    // void py_runner::contract_epilogue(int n_results) {
-    //     if(n_results != 1) {
-    //         m_log->error("Contract returned more than one result");
-    //         m_result_callback(error_code::result_count);
-    //         return;
-    //     }
+    /*
+        // void py_runner::contract_epilogue(int n_results) {
+        //     if(n_results != 1) {
+        //         m_log->error("Contract returned more than one result");
+        //         m_result_callback(error_code::result_count);
+        //         return;
+        //     }
 
-    //     auto results = runtime_locking_shard::state_update_type();
+        //     auto results = runtime_locking_shard::state_update_type();
 
-    //     m_log->trace(this, "running calling result callback");
-    //     m_result_callback(std::move(results));
-    //     m_log->trace(this, "py_runner finished contract epilogue");
-    // }
+        //     m_log->trace(this, "running calling result callback");
+        //     m_result_callback(std::move(results));
+        //     m_log->trace(this, "py_runner finished contract epilogue");
+        // }
 
-    // // use to pass messages from python -> c env
-    // auto py_runner::get_stack_string(int index) -> std::optional<buffer> {
-    //     size_t sz{};
-    //     auto buf = buffer();
-    //     m_state += index;
-    //     buf.append(&m_state, sz);
-    //     return buf;
-    // }
+        // // use to pass messages from python -> c env
+        // auto py_runner::get_stack_string(int index) -> std::optional<buffer>
+       {
+        //     size_t sz{};
+        //     auto buf = buffer();
+        //     m_state += index;
+        //     buf.append(&m_state, sz);
+        //     return buf;
+        // }
 
-    // void py_runner::schedule_contract() {
-    //     //int n_results{};
+        // void py_runner::schedule_contract() {
+        //     //int n_results{};
 
-    //     //contract_epilogue(0);
-    // }
-
+        //     //contract_epilogue(0);
+        // }
+    */
     void py_runner::handle_try_lock(
         const broker::interface::try_lock_return_type& res) {
         auto maybe_error = std::visit(
             overloaded{[&]([[maybe_unused]] const broker::value_type& v)
                            -> std::optional<error_code> {
                            m_log->trace("broker return", v.c_str());
+                           // do something with what the shard returns why
+                           // don't you you shmuck
+                           //    m_return_values.push_back(v);
                            return std::nullopt;
                        },
                        [&](const broker::interface::error_code& /* e */)
@@ -276,7 +319,46 @@ namespace cbdc::parsec::agent::runner {
             m_result_callback(maybe_error.value());
             return;
         }
+        return;
         // schedule_contract();
+    }
+
+    void py_runner::get_value_at(runtime_locking_shard::key_type key) {
+        // auto success =
+        m_try_lock_callback(std::move(key), // try locking the key
+                            broker::lock_type::read,
+                            [&](auto res) {
+                                handle_try_lock(res);
+                            });
+
+        /*
+        Need to follow how the lua runner does it:
+        - pushes value to lua state
+        - calls again ("resumes")
+        - Need to do this in an orderly way such that the value is finalized
+            upon accessing it
+        */
+
+        /*
+         How about try:
+         Ask for value k:
+         if k not contianed in set of requested values, add it to the set
+         if k contained: wait (?)
+        */
+
+        // if(!success) {
+        //     m_log->error("Failed to issue try lock command");
+        //     m_result_callback(error_code::internal_error);
+        //     // return cbdc::buffer(); // this should be an error
+        // }
+        // else {
+        //     if(!m_return_values.size()) {
+        //         return cbdc::buffer();
+        //     }
+        //     auto ret = m_return_values[0];
+        //     m_return_values.pop_back();
+        //     return ret; // this should be what comes from the shard?
+        // }
     }
 
     // auto py_runner::check_sig(lua_State* L) -> int {

@@ -105,12 +105,19 @@ namespace cbdc::parsec::runtime_locking_shard {
         }();
 
         if(maybe_error.has_value()) {
+            // if(locktype == lock_type::read && maybe_error.value() != error_code::unknown_ticket) {
+            //     m_tickets.find(ticket_number)->second.m_state = ticket_state::wounded;
+            // }
             result_callback(shard_error{maybe_error.value(), w_details});
+
         } else {
             // Call all the result callbacks without holding the lock
             for(auto& callback : callbacks) {
                 callback.m_callback(std::move(callback.m_returning));
             }
+            // if(locktype == lock_type::read) {
+            //     m_tickets.find(ticket_number)->second.m_state = ticket_state::committed;
+            // }
         }
 
         return true;

@@ -18,14 +18,15 @@ namespace cbdc::parsec {
     account_wallet::account_wallet(std::shared_ptr<logging::log> log,
                                    std::shared_ptr<broker::interface> broker,
                                    std::shared_ptr<agent::rpc::client> agent,
-                                   cbdc::buffer pay_contract_key)
+                                   cbdc::buffer pay_contract_key,
+                                   std::string account_name)
         : m_log(std::move(log)),
           m_agent(std::move(agent)),
           m_broker(std::move(broker)),
-          m_pay_contract_key(std::move(pay_contract_key)) {
+          m_pay_contract_key(std::move(pay_contract_key),
+          m_pubkey(account_name)) {
         auto rnd = cbdc::random_source(cbdc::config::random_source);
         // generate some random public key private key pairing
-        m_privkey = rnd.random_hash();
         m_pubkey = cbdc::pubkey_from_privkey(m_privkey, m_secp.get());
 
         // stashes will be prefixed with "stash_"
@@ -70,40 +71,42 @@ namespace cbdc::parsec {
         return execute_params(params, false, result_callback);
     }
 
-    auto account_wallet::make_pay_params(pubkey_t to, uint64_t amount) const
+    auto account_wallet::make_pay_params(key_type to, uint64_t amount) const
         -> cbdc::buffer {
         auto params = cbdc::buffer();
-        params.append(m_pubkey.data(), m_pubkey.size());
         params.append(to.data(), to.size());
         params.append(&amount, sizeof(amount));
-        params.append(&m_sequence, sizeof(m_sequence));
+        // params.append(m_pubkey.data(), m_pubkey.size());
+        // params.append(to.data(), to.size());
+        // params.append(&amount, sizeof(amount));
+        // params.append(&m_sequence, sizeof(m_sequence));
 
 
-        // below may need to change based on crypto env
-        auto sig_payload = cbdc::buffer();
-        sig_payload.append(to.data(), to.size());
-        sig_payload.append(&amount, sizeof(amount));
-        sig_payload.append(&m_sequence, sizeof(m_sequence));
+        // // below may need to change based on crypto env
+        // auto sig_payload = cbdc::buffer();
+        // sig_payload.append(to.data(), to.size());
+        // sig_payload.append(&amount, sizeof(amount));
+        // sig_payload.append(&m_sequence, sizeof(m_sequence));
 
-        auto sha = CSHA256();
-        sha.Write(sig_payload.c_ptr(), sig_payload.size());
-        auto sighash = cbdc::hash_t();
-        sha.Finalize(sighash.data());
+        // auto sha = CSHA256();
+        // sha.Write(sig_payload.c_ptr(), sig_payload.size());
+        // auto sighash = cbdc::hash_t();
+        // sha.Finalize(sighash.data());
 
-        secp256k1_keypair keypair{};
-        [[maybe_unused]] auto ret = secp256k1_keypair_create(m_secp.get(),
-                                                             &keypair,
-                                                             m_privkey.data());
+        // secp256k1_keypair keypair{};
+        // [[maybe_unused]] auto ret = secp256k1_keypair_create(m_secp.get(),
+        //                                                      &keypair,
+        //                                                      m_privkey.data());
 
-        cbdc::signature_t sig{};
-        ret = secp256k1_schnorrsig_sign(m_secp.get(),
-                                        sig.data(),
-                                        sighash.data(),
-                                        &keypair,
-                                        nullptr,
-                                        nullptr);
-        params.append(sig.data(), sig.size());
-        // --
+        // cbdc::signature_t sig{};
+        // ret = secp256k1_schnorrsig_sign(m_secp.get(),
+        //                                 sig.data(),
+        //                                 sighash.data(),
+        //                                 &keypair,
+        //                                 nullptr,
+        //                                 nullptr);
+        // params.append(sig.data(), sig.size());
+        // // --
 
         return params;
     }

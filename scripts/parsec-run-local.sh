@@ -47,7 +47,7 @@ echo Running agent on $IP:$PORT
 echo Log level = $LOGLEVEL
 echo Runner type = $RUNNER_TYPE
 
-$DBG ./build/src/parsec/runtime_locking_shard/runtime_locking_shardd --shard_count=1 \
+rr record ./build/src/parsec/runtime_locking_shard/runtime_locking_shardd --shard_count=1 \
     --shard0_count=1 --shard00_endpoint=$IP:5556 \
     --shard00_raft_endpoint=$IP:5557 --node_id=0 --component_id=0 \
     --agent_count=1 --agent0_endpoint=$IP:6666 --ticket_machine_count=1 \
@@ -67,7 +67,7 @@ sleep 5
 #   --ticket_machine0_endpoint=$IP:7777 --loglevel=$LOGLEVEL \
 #   --runner_type=$RUNNER_TYPE > logs/agentd.log &
 ./scripts/wait-for-it.sh -s $IP:7777 -t 60 -- ./scripts/wait-for-it.sh -s \
-    $IP:5556 -t 60 -- rr ./build/src/parsec/agent/agentd --shard_count=1 \
+    $IP:5556 -t 60 -- rr record ./build/src/parsec/agent/agentd --shard_count=1 \
     --shard0_count=1 --shard00_endpoint=$IP:5556 --node_id=0 --component_id=0 \
     --agent_count=1 --agent0_endpoint=$IP:$PORT --ticket_machine_count=1 \
     --ticket_machine0_endpoint=$IP:7777 --loglevel=$LOGLEVEL \

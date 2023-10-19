@@ -42,7 +42,9 @@ namespace cbdc::parsec::agent {
             /// Error during rollback.
             rollback_error,
             /// Transient error, execution should be retried.
-            retry
+            retry,
+            /// Something was called in the incorrect state
+            state_error
         };
 
         /// Return type from function execution. Either the committed state
