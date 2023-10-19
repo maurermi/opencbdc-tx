@@ -171,6 +171,14 @@ auto main(int argc, char** argv) -> int {
 
     log->info("Agent running");
 
+    std::thread ticket_state_logger([&broker] {
+        while(true) {
+            broker->log_tickets();
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    });
+    ticket_state_logger.detach();
+
     while(running) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }

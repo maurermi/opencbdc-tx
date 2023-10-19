@@ -71,6 +71,30 @@ namespace cbdc::parsec::broker {
         return m_highest_ticket;
     }
 
+    void impl::log_tickets() {
+        m_log->trace("Logging tickets");
+        for(auto i : m_tickets) {
+            auto i_state = i.second->m_state;
+            switch(i_state) {
+                case ticket_state::begun:
+                    m_log->trace("Ticket Log", i.first, "begun");
+                    break;
+                case ticket_state::prepared:
+                    m_log->trace("Ticket Log", i.first, "prepared");
+                    break;
+                case ticket_state::committed:
+                    m_log->trace("Ticket Log", i.first, "committed");
+                    break;
+                case ticket_state::aborted:
+                    m_log->trace("Ticket Log", i.first, "aborted");
+                    break;
+                default:
+                    m_log->warn("Ticket Log", i.first, "Cannot resolve state");
+                    break;
+            }
+        }
+    }
+
     void impl::handle_lock(
         ticket_number_type ticket_number,
         key_type key,
@@ -796,7 +820,8 @@ namespace cbdc::parsec::broker {
         // if(locktype == lock_type::read) {
         //     // set ticket state to aborted
         //     auto ticket = m_tickets.find(ticket_number);
-        //     if(ticket != m_tickets.end()) { // this check is probably not required
+        //     if(ticket != m_tickets.end()) { // this check is probably not
+        //     required
         //         ticket->second->m_state = ticket_state::committed;
         //     }
         // }
