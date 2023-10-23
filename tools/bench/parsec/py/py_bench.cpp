@@ -103,6 +103,14 @@ auto main(int argc, char** argv) -> int {
         directory,
         log);
 
+    std::thread ticket_state_logger([&broker] {
+        while(true) {
+            broker->log_tickets();
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    });
+    ticket_state_logger.detach();
+
     auto pay_contract = cbdc::buffer();
     // std::string contract
     //     = "import webbrowser\n"
@@ -119,55 +127,65 @@ auto main(int argc, char** argv) -> int {
                             pythoncontracts::firefox_key.size());
 
     log->info("Inserting pay contract");
-    auto ret
-        = cbdc::parsec::put_row(broker,
-                                pay_contract_key,
-                                pay_contract,
-                                [&](bool res) {
-                                    if(!res) {
-                                        init_error = true;
-                                    } else {
-                                        log->info("Inserted pay contract", pay_contract.c_str());
-                                        init_count++;
-                                    }
-                                });
+    auto ret = cbdc::parsec::put_row(broker,
+                                     pay_contract_key,
+                                     pay_contract,
+                                     [&](bool res) {
+                                         if(!res) {
+                                             init_error = true;
+                                         } else {
+                                             log->info("Inserted pay contract",
+                                                       pay_contract.c_str());
+                                             init_count++;
+                                         }
+                                     });
     if(!ret) {
         init_error = true;
     }
     std::this_thread::sleep_for(std::chrono::seconds(10));
 
-    // std::string michael = "michael";
-    // auto k = cbdc::buffer();
-    // k.append(michael.c_str(), michael.size());
-    // auto v = cbdc::buffer();
-    // v.append("abcde", 5);
-    // auto f = cbdc::parsec::put_row(broker, k, v, [&](bool res) {
-    //     if(!res) {
-    //         log->info("Did not insert michael");
-    //     } else {
-    //         log->info("Inserted michael");
-    //     }
-    // });
-    // if(!f) {
-    //     init_error = true;
-    // }
+    std::string michael = "michael";
+    auto k = cbdc::buffer();
+    k.append(michael.c_str(), michael.size());
+    auto v = cbdc::buffer();
+    v.append("abcde", 5);
+    auto f = cbdc::parsec::put_row(broker, k, v, [&](bool res) {
+        if(!res) {
+            log->info("Did not insert michael");
+        } else {
+            log->info("Inserted michael");
+        }
+    });
+    if(!f) {
+        init_error = true;
+    }
 
-    // std::this_thread::sleep_for(std::chrono::seconds(10));
-
-    // auto return_value = cbdc::buffer();
-    // ret = cbdc::parsec::get_row(broker, k, [&](cbdc::parsec::broker::interface::try_lock_return_type res) {
-    //     if(std::holds_alternative<
-    //            cbdc::parsec::runtime_locking_shard::value_type>(res)) {
-    //         auto r = std::get<cbdc::parsec::runtime_locking_shard::value_type>(res);
-    //         log->trace("Found this (callback):", r.c_str());
-    //         return_value = r;
-    //     }
-    //     else {
-    //         log->error("get row callback recieved error");
-    //     }
-    // });
-    // std::this_thread::sleep_for(std::chrono::seconds(10));
-    // log->trace("Found this:", return_value.c_str());
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+    auto return_value = cbdc::buffer();
+    auto val = cbdc::parsec::get_row(
+        broker,
+        k,
+        [&](cbdc::parsec::broker::interface::try_lock_return_type res) {
+            if(std::holds_alternative<
+                   cbdc::parsec::runtime_locking_shard::value_type>(res)) {
+                auto r = std::get<
+                    cbdc::parsec::runtime_locking_shard::value_type>(res);
+                log->trace("Found this (callback):", r.c_str());
+                return_value = r;
+            } else {
+                log->error("get row callback recieved error");
+            }
+        });
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+    if(std::holds_alternative<cbdc::parsec::runtime_locking_shard::value_type>(
+           val)) {
+        log->trace(
+            "Found this:",
+            std::get<cbdc::parsec::runtime_locking_shard::value_type>(val)
+                .c_str());
+    } else {
+        log->trace("Something went wrong");
+    }
 
     constexpr uint64_t timeout = 30;
 
@@ -327,22 +345,24 @@ auto main(int argc, char** argv) -> int {
     // if(!r) {
     //     log->error("exec error");
     // }
-    std::this_thread::sleep_for(std::chrono::seconds(15));
-    auto k = cbdc::buffer();
-    k.append("some key", 8);
-    auto return_value = cbdc::buffer();
-    ret = cbdc::parsec::get_row(broker, k, [&](cbdc::parsec::broker::interface::try_lock_return_type res) {
-        if(std::holds_alternative<
-               cbdc::parsec::runtime_locking_shard::value_type>(res)) {
-            auto cb_res = std::get<cbdc::parsec::runtime_locking_shard::value_type>(res);
-            log->trace("Found this (callback):", cb_res.c_str());
-            return_value = cb_res;
-        }
-        else {
-            log->error("get row callback recieved error");
-        }
-    });
-    std::this_thread::sleep_for(std::chrono::seconds(10));
-    log->trace("Found this:", return_value.c_str());
+    // std::this_thread::sleep_for(std::chrono::seconds(15));
+    // auto k = cbdc::buffer();
+    // k.append("some key", 8);
+    // auto return_value = cbdc::buffer();
+    // ret = cbdc::parsec::get_row(broker, k,
+    // [&](cbdc::parsec::broker::interface::try_lock_return_type res) {
+    //     if(std::holds_alternative<
+    //            cbdc::parsec::runtime_locking_shard::value_type>(res)) {
+    //         auto cb_res =
+    //         std::get<cbdc::parsec::runtime_locking_shard::value_type>(res);
+    //         log->trace("Found this (callback):", cb_res.c_str());
+    //         return_value = cb_res;
+    //     }
+    //     else {
+    //         log->error("get row callback recieved error");
+    //     }
+    // });
+    // std::this_thread::sleep_for(std::chrono::seconds(10));
+    // log->trace("Found this:", return_value.c_str());
     return 0;
 }

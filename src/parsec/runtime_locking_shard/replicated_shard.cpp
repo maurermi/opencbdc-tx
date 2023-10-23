@@ -66,4 +66,8 @@ namespace cbdc::parsec::runtime_locking_shard {
         std::unique_lock l(m_mut);
         return m_state;
     }
+
+    auto replicated_shard::get_ticket_data() -> tickets_type {
+        return m_tickets;
+    }
 }

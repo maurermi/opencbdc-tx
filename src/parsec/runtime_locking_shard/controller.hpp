@@ -42,6 +42,9 @@ namespace cbdc::parsec::runtime_locking_shard {
         /// \return true if initialization was successful.
         auto init() -> bool;
 
+        /// Get information about the tickets being processed by this shard
+        void log_tickets();
+
       private:
         auto raft_callback(nuraft::cb_func::Type type,
                            nuraft::cb_func::Param* param)
