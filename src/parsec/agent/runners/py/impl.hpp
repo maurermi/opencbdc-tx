@@ -38,35 +38,60 @@ namespace cbdc::parsec::agent::runner {
         static constexpr auto initial_lock_type = broker::lock_type::read;
 
       private:
-        int m_state; // should reflect state (may not need)
+        // Store the input arguments for the function to be executed
         std::vector<std::string> m_input_args;
+
+        // Store the names of the arguments to be pulled from the Python
+        // environment
         std::vector<std::string> m_return_args;
-        std::vector<cbdc::buffer> m_return_values;
-        // std::vector<std::string> m_return_types;
+
+        // Store the values associated with m_return args. These are used to
+        // update state.
+        std::vector<runtime_locking_shard::value_type> m_return_values;
+
+        // Store the keys which are to be updated as a result of this
+        // computation
+        std::vector<runtime_locking_shard::key_type> m_update_keys;
+
+        // The inputs to the function which are stored on the shards.
+        // Therefore, the values are not necessarially known to the caller.
+        std::vector<runtime_locking_shard::key_type> m_shard_inputs;
+
+        // Tracks the expected types of values returned from this function.
         std::string m_return_types;
 
-        // void update_state();
+        // At the end of execution, pull the relevant values from the Python
+        // state and send update(s) to the shards
         void update_state(PyObject* localDictionary);
-        void get_value_at(runtime_locking_shard::key_type key);
-        // auto get_value_at_helper() -> runtime_locking_shard::value_type;
 
-        // only creating both because ostensibly m_param and m_function
-        // can be different data types
+        // Parse the function params into something usable by the Python VM
         auto parse_params() -> std::vector<std::string>;
+
+        // Parse the function header
+        // The function header is expected to contain information about the
+        // function arguments and return values.
+        // Fills m_input_args, m_return_args, m_return_types.
+        // Trims the function header from m_function.
         void parse_header();
 
-        // void contract_epilogue(int n_results);
+        // Pull the relevant values from the Python state
+        // Helper for update_state()
+        void get_state_updates(PyObject* localDictionary);
 
-        // auto get_stack_string(int index) -> std::optional<buffer>;
-
-        // void schedule_contract();
-
+        // Handle the return of a try lock request. Relevant for communicating
+        // information within the runner scope.
+        /// \note As implemented, this method does not store the value returned
+        /// from the shards on success
         void
         handle_try_lock(const broker::interface::try_lock_return_type& res);
 
-        bool m_halt = true;
-        std::promise<cbdc::buffer> m_val_promise;
-        std::future<cbdc::buffer> m_val_fut;
+        // Handle a try lock request but if a value is returned from the
+        // shards, store it somewhere in the runner scope. Useful for getting
+        // arguments from the shards to pass into the VM.
+        /// \note This is where shard-dependent input arguments are collected from the shards
+        auto handle_try_lock_input_arg(
+            const broker::interface::try_lock_return_type& res,
+            broker::value_type& dest) -> bool;
     };
 }
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2021 MIT Digital Currency Initiative,
+// Copyright (c) 2023 MIT Digital Currency Initiative,
 //                    Federal Reserve Bank of Boston
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -10,17 +10,9 @@
 #include "util/common/variant_overloaded.hpp"
 
 #include <cassert>
-#include <secp256k1.h>
-#include <secp256k1_schnorrsig.h>
 #include <thread>
 
 namespace cbdc::parsec::agent::runner {
-    static const auto secp_context
-        = std::unique_ptr<secp256k1_context,
-                          decltype(&secp256k1_context_destroy)>(
-            secp256k1_context_create(SECP256K1_CONTEXT_VERIFY),
-            &secp256k1_context_destroy);
-
     py_runner::py_runner(std::shared_ptr<logging::log> logger,
                          const cbdc::parsec::config& cfg,
                          runtime_locking_shard::value_type function,
@@ -45,166 +37,179 @@ namespace cbdc::parsec::agent::runner {
     auto py_runner::run() -> bool {
         m_log->info("calling run");
 
-        // std::string michael = "michael";
-        // auto k = cbdc::buffer();
-        // k.append(michael.c_str(), michael.size());
-        // auto res = cbdc::buffer();
-        // res.append("this is garbage", 16);
-        // get_value_at(k);
-        // m_log->trace("what we found", res.c_str());
         Py_Initialize();
 
-        // to pass in args, use Py_BuildValue() to build string
-
-        /*
-            Next Step:
-            Define a way for functions to have signatures
-                Specifically, what are the output(s) of the function
-                and their types.
-        */
-
-        // m_log->trace(m_function.c_str());
         PyObject* main = PyImport_AddModule("__main__");
         PyObject* globalDictionary = PyModule_GetDict(main);
         PyObject* localDictionary = PyDict_New();
-        //
-        parse_header();
-        auto params = parse_params();
-        // Need to determine a scheme to create a list of argument names with
-        // values store each function as {n_args, arg_names, function_script}
-        // args.push_back("website1");
-        // args.push_back("website2");
 
-        // int argc = std::stoi(params[0]);
-
-        // m_log->trace("param count: ", params.size());
-        if(m_input_args.size() < params.size()) {
-            m_log->error("Too few arguments passed to function");
+        if(m_function.size() == 0) {
+            m_log->error("Contract has length 0, key may be invalid");
+            m_result_callback(runtime_locking_shard::state_update_type());
             return true;
         }
+
+        // Parse contract header data, trim from m_function.
+        parse_header();
+        // Parse the parameters buffer into its component strings.
+        auto params = parse_params();
+
+        for(runtime_locking_shard::key_type key : m_shard_inputs) {
+            auto dest = cbdc::buffer();
+            auto valid_resp = std::promise<bool>();
+
+            /// \todo These read locks should be freed before proceeding to the next step
+            auto locktype = runtime_locking_shard::lock_type::read;
+            if(std::find(m_update_keys.begin(), m_update_keys.end(), key)
+               != m_update_keys.end()) {
+                locktype = runtime_locking_shard::lock_type::write;
+            }
+
+            // This is where the shard inputs are retrieved.
+            auto success = m_try_lock_callback(key, locktype, [&](auto res) {
+                auto data = handle_try_lock_input_arg(std::move(res), dest);
+                valid_resp.set_value(data);
+            });
+            if(!success) {
+                m_log->error("Failed to issue try lock command");
+                m_result_callback(error_code::internal_error);
+            }
+
+            if(dest.data() == nullptr) {
+                m_log->warn(key.c_str(),
+                            "has no associated data. Defining value stored at",
+                            key.c_str(),
+                            "to be \"0\"");
+                dest.append("0", 2);
+            }
+            params.push_back(dest.c_str());
+        }
+
+        if(m_input_args.size() != params.size()) {
+            m_log->error("Incorrect number of arguments passed to function");
+            return true;
+        }
+
         for(unsigned long i = 0; i < params.size(); i++) {
             PyObject* value = PyUnicode_FromString(params[i].c_str());
             PyDict_SetItemString(localDictionary,
                                  m_input_args[i].c_str(),
                                  value);
         }
-        // introduce a callback into C++ that can interact with shards
 
-        // passing arguments
-        // PyDict_SetItemString(localDictionary,
-        //                      "account",
-        //                      PyUnicode_FromString(""));
-        // PyDict_SetItemString(localDictionary,
-        //                      "new_balance",
-        //                      PyLong_FromLong(0));
-        // m_log->trace(m_function.c_str());
         auto r = PyRun_String(m_function.c_str(),
                               Py_file_input,
                               globalDictionary,
                               localDictionary);
-
-        // update_state();
-        // long result;
-        // auto res = PyDict_GetItemString(localDictionary, "website1");
-        // if(!PyArg_ParseTuple(res, "l", result)) {
-        //     m_log->error("tuple could not be parsed");
-        // }
-        // else {
-        //     m_log->trace("Tuple parsed", result);
-        // }
-        auto value
-            = PyLong_AsLong(PyDict_GetItemString(localDictionary, "website1"));
-        m_log->trace("Website1 = ", value);
-        // update_state(localDictionary);
-        //  schedule_contract();
         if(!r) {
-            m_log->error("R = ", r);
-            m_log->error("PyRun had error");
+            m_log->error("Python VM generated error:", r);
         }
+        update_state(localDictionary);
         if(Py_FinalizeEx() < 0) {
             m_log->fatal("Py not finalized correctly");
         }
 
-        // m_result_callback(error_code::exec_error); // REALLY SHOULD CALL THE
-        //  CALLBACK SOMEWHERE!
-
-        // m_result_callback(error_code::exec_error);
-        // m_log->info("calling run");
-
-        // get_value_at(k);
-        // res = cbdc::buffer();
-        // res.append("this is garbage", 16);
-        // if(m_return_values.size() > 0) {
-        //     res = m_return_values[0];
-        // }
-        // m_log->trace("what we found", res.c_str());
-
-        // call m_result_callback with "state update type" or error code
-        auto results = runtime_locking_shard::state_update_type();
-        auto key_buf = cbdc::buffer();
-        auto value_buf = cbdc::buffer();
-        key_buf.append("some key", 8);
-        value_buf.append("some value", 10);
-        results.emplace(std::move(key_buf),
-                        std::move(value_buf));
-        m_result_callback(std::move(results));
-
+        m_log->trace("Done running");
         return true;
     }
 
-    // fills m_input_args, m_return_args, m_return_types
     void py_runner::parse_header() {
         /* Assumes that header is return types | return args | input args |
-         * func */
-        auto charPtr = std::string((char*)m_function.data());
+           function code */
+        auto functionString = std::string((char*)m_function.data());
 
         m_input_args.clear();
         m_return_args.clear();
         m_return_types.clear();
-        // need to delete the start of m_function
 
-        // parse the return types of the header
-        auto arg_delim = charPtr.find('|');
-        auto arg_string = charPtr.substr(0, arg_delim);
+        auto arg_delim = functionString.find('|');
+        auto arg_string = functionString.substr(0, arg_delim);
         size_t pos = 0;
         m_return_types = arg_string;
-        // while((pos = arg_string.find(",", 0)) != std::string::npos) {
-        //     m_return_types.push_back(arg_string.substr(0, pos));
-        //     arg_string.erase(0, pos + 1);
-        // }
-        charPtr.erase(0, arg_delim + 1);
+        functionString.erase(0, arg_delim + 1);
 
-        arg_delim = charPtr.find('|');
-        arg_string = charPtr.substr(0, arg_delim);
+        arg_delim = functionString.find('|');
+        arg_string = functionString.substr(0, arg_delim);
         pos = 0;
         while((pos = arg_string.find(",", 0)) != std::string::npos) {
             m_return_args.push_back(arg_string.substr(0, pos));
             arg_string.erase(0, pos + 1);
         }
-        charPtr.erase(0, arg_delim + 1);
+        functionString.erase(0, arg_delim + 1);
 
-        arg_delim = charPtr.find('|');
-        arg_string = charPtr.substr(0, arg_delim);
+        arg_delim = functionString.find('|');
+        arg_string = functionString.substr(0, arg_delim);
         pos = 0;
         while((pos = arg_string.find(",", 0)) != std::string::npos) {
             m_input_args.push_back(arg_string.substr(0, pos));
             arg_string.erase(0, pos + 1);
         }
-        charPtr.erase(0, arg_delim + 1);
+        functionString.erase(0, arg_delim + 1);
 
         m_function = cbdc::buffer();
-        m_function.append(charPtr.c_str(), charPtr.size());
+        m_function.append(functionString.c_str(), functionString.size());
+        m_function.append("\0", 1);
     }
 
     auto py_runner::parse_params() -> std::vector<std::string> {
-        std::vector<std::string> params;
-        char* charPtr = (char*)m_param.data();
-        // thanks chatgpt
-        while(*charPtr != '\0') {
-            params.emplace_back(
-                charPtr); // Create a string from the current position
-            charPtr += params.back().length()
-                     + 1; // Move the pointer to the next string
+        std::vector<std::string> params(0);
+
+        // Input validation to ensure that it's safe to use strlen
+        if(m_param.size() == 0) {
+            m_log->error("m_param contains no data");
+            return params;
+        }
+        size_t pipeCount = 0;
+        size_t stringCount = 0;
+        for(size_t i = 0; i < m_param.size(); i++) {
+            if(((char*)m_param.data())[i] == '|') {
+                pipeCount++;
+            } else if(i > 0 && (int)((char*)m_param.data())[i] == 0
+                      && (int)((char*)m_param.data())[i - 1] != 0) {
+                stringCount++;
+            }
+        }
+        if(pipeCount != 3) {
+            m_log->error("m_param sections are improperly formatted");
+            return params;
+        } else if(stringCount
+                  != m_input_args.size() + m_return_args.size() + pipeCount) {
+            m_log->error("m_param contains too few arguments or arguments are "
+                         "improperly formatted");
+            return params;
+        }
+        m_param.append("\0", 1);
+        // ---
+
+        char* paramString = (char*)m_param.data();
+
+        // get parameters that are user inputs
+        while(*paramString != '|') {
+            params.emplace_back(paramString);
+            paramString += params.back().length() + 1;
+        }
+        paramString += 2;
+
+        // get parameters which are to be pulled from shards
+        while(*paramString != '|') {
+            auto tmp = cbdc::buffer();
+            /// \todo Prefer a solution which does not use strlen
+            tmp.append(paramString, std::strlen(paramString) + 1);
+
+            m_shard_inputs.emplace_back(tmp);
+            /// \todo Prefer a solution which does not use strlen
+            paramString += std::strlen(paramString) + 1;
+        }
+        paramString += 2;
+
+        // get the state update keys
+        while(*paramString != '|') { // was previously '\0'
+            auto tmp = cbdc::buffer();
+            tmp.append(paramString, std::strlen(paramString) + 1);
+
+            m_update_keys.emplace_back(tmp);
+            /// \todo Prefer a solution which does not use strlen
+            paramString += std::strlen(paramString) + 1;
         }
 
         return params;
@@ -212,92 +217,92 @@ namespace cbdc::parsec::agent::runner {
 
     void py_runner::update_state(PyObject* localDictionary) {
         auto updates = runtime_locking_shard::state_update_type();
-        // if(PyUnicode_Check(PyDict_GetItemString(localDictionary,
-        // "account"))) {
-        //     m_log->trace("OK");
-        // }
-        // else {
-        //     m_log->error("NOT OK");
-        // }
-        char* key;
-        // for(std::string v : m_return_args) {
-        //     // determine type of arg then parse
-        //     auto ret_val = PyDict_GetItemString(localDictionary, v);
-        //     Py_TYPE(ret_val);
-        // }
-        if(PyUnicode_Check(PyDict_GetItemString(localDictionary, "account"))) {
-            m_log->trace("unicode check passed");
-            key = PyBytes_AS_STRING(PyUnicode_AsEncodedString(
-                PyDict_GetItemString(localDictionary, "account"),
-                "UTF-8",
-                "strict"));
-        } else {
-            key = PyBytes_AsString(
-                PyDict_GetItemString(localDictionary, "account"));
+        get_state_updates(localDictionary);
+        if(m_update_keys.size() != m_return_args.size()) {
+            m_log->error(m_update_keys.size(),
+                         "keys found",
+                         m_return_args.size(),
+                         "expected");
         }
-        auto value = PyLong_AsLong(
-            PyDict_GetItemString(localDictionary, "new_balance"));
-        auto key_buf = cbdc::buffer();
-        key_buf.append(key, strlen(key) + 1);
-        auto value_buf = cbdc::buffer();
-        value_buf.append(&value, 4);
-        updates.emplace(key_buf,
-                        std::move(value_buf)); // ought to use std::move
-        m_log->trace("key:", key);
-        m_log->trace("value", value);
-        auto success = m_try_lock_callback(key_buf, // ought to use std::move
-                                           broker::lock_type::write,
-                                           [&](auto res) {
-                                               handle_try_lock(res);
-                                           });
-        if(!success) {
-            m_log->error("Failed to issue try lock command");
-            m_result_callback(error_code::internal_error);
+        m_log->trace("Adding updates to map");
+        for(size_t i = 0; i < m_return_values.size(); i++) {
+            /// Get locks that we don't already hold
+            /// \todo Is this slower than just requesting the lock ?
+            if(std::find(m_shard_inputs.begin(),
+                         m_shard_inputs.end(),
+                         m_update_keys[i])
+               == m_shard_inputs.end()) {
+                auto success
+                    = m_try_lock_callback(m_update_keys[i],
+                                          broker::lock_type::write,
+                                          [&](auto res) {
+                                              handle_try_lock(std::move(res));
+                                          });
+                if(!success) {
+                    m_log->error("Failed to issue try lock command");
+                    m_result_callback(error_code::internal_error);
+                }
+            }
+            m_log->trace("Update",
+                         m_update_keys[i].c_str(),
+                         m_return_values[i].c_str());
+            updates.emplace(m_update_keys[i], m_return_values[i]);
         }
 
+        // Communicate updates to agent scope. Will write back to shards.
         m_result_callback(std::move(updates));
+
+        return;
     }
 
-    /*
-        // void py_runner::contract_epilogue(int n_results) {
-        //     if(n_results != 1) {
-        //         m_log->error("Contract returned more than one result");
-        //         m_result_callback(error_code::result_count);
-        //         return;
-        //     }
-
-        //     auto results = runtime_locking_shard::state_update_type();
-
-        //     m_log->trace(this, "running calling result callback");
-        //     m_result_callback(std::move(results));
-        //     m_log->trace(this, "py_runner finished contract epilogue");
-        // }
-
-        // // use to pass messages from python -> c env
-        // auto py_runner::get_stack_string(int index) -> std::optional<buffer>
-       {
-        //     size_t sz{};
-        //     auto buf = buffer();
-        //     m_state += index;
-        //     buf.append(&m_state, sz);
-        //     return buf;
-        // }
-
-        // void py_runner::schedule_contract() {
-        //     //int n_results{};
-
-        //     //contract_epilogue(0);
-        // }
-    */
     void py_runner::handle_try_lock(
         const broker::interface::try_lock_return_type& res) {
         auto maybe_error = std::visit(
+            overloaded{
+                [&]([[maybe_unused]] const broker::value_type& v)
+                    -> std::optional<error_code> {
+                    m_log->trace(
+                        v.c_str(),
+                        "Returned from try_lock request to handle_try_lock.");
+                    m_log->warn("Discarding returned value. Use "
+                                "handle_try_lock_input_arg to store result.");
+                    return std::nullopt;
+                },
+                [&](const broker::interface::error_code& /* e */)
+                    -> std::optional<error_code> {
+                    m_log->error("Broker error acquiring lock");
+                    return error_code::lock_error;
+                },
+                [&](const runtime_locking_shard::shard_error& e)
+                    -> std::optional<error_code> {
+                    if(e.m_error_code
+                       == runtime_locking_shard::error_code::wounded) {
+                        return error_code::wounded;
+                    }
+                    m_log->error("Shard error acquiring lock");
+                    return error_code::lock_error;
+                }},
+            res);
+        if(maybe_error.has_value()) {
+            m_result_callback(maybe_error.value());
+            return;
+        }
+        return;
+    }
+
+    auto py_runner::handle_try_lock_input_arg(
+        const broker::interface::try_lock_return_type& res,
+        broker::value_type& dest) -> bool {
+        auto maybe_error = std::visit(
             overloaded{[&]([[maybe_unused]] const broker::value_type& v)
                            -> std::optional<error_code> {
-                           m_log->trace("broker return", v.c_str());
-                           // do something with what the shard returns why
-                           // don't you you shmuck
-                           //    m_return_values.push_back(v);
+                           m_log->trace("broker return input arg", v.c_str());
+                           if(v.data() == nullptr) {
+                               m_log->warn(
+                                   "Value at given key accessed, but key has "
+                                   "no data. Saving empty buffer.");
+                           }
+                           dest = v;
                            return std::nullopt;
                        },
                        [&](const broker::interface::error_code& /* e */)
@@ -317,51 +322,77 @@ namespace cbdc::parsec::agent::runner {
             res);
         if(maybe_error.has_value()) {
             m_result_callback(maybe_error.value());
-            return;
+            return false;
+        }
+        return true;
+    }
+
+    void py_runner::get_state_updates(PyObject* localDictionary) {
+        for(size_t i = 0; i < m_return_types.size(); i++) {
+            auto ch = m_return_types[i];
+            m_log->trace("Parsing:", m_return_args[i].c_str());
+            auto word = PyDict_GetItemString(localDictionary,
+                                             m_return_args[i].c_str());
+            auto buf = cbdc::buffer();
+            switch(ch) {
+                case 'l': {
+                    m_log->trace("Parsing long");
+                    auto res = PyLong_AsLong(word);
+                    buf.append(&res, sizeof(long));
+                    break;
+                }
+                case 'd': {
+                    m_log->trace("Parsing double");
+                    auto res = PyFloat_AsDouble(word);
+                    buf.append(&res, sizeof(double));
+                    break;
+                }
+                case 's': {
+                    m_log->trace("Parsing string");
+                    char* res;
+                    if(PyUnicode_Check(word)) {
+                        res = PyBytes_AS_STRING(
+                            PyUnicode_AsEncodedString(word,
+                                                      "UTF-8",
+                                                      "strict"));
+                    } else {
+                        res = PyBytes_AsString(word);
+                    }
+                    if(res) {
+                        // PyBytes_AsString returns a null terminated string
+                        buf.append(res, strlen(res) + 1);
+                    }
+                    break;
+                }
+                case '?': {
+                    m_log->trace("Parsing bool");
+                    auto res = PyLong_AsLong(word);
+                    auto b = (res != 0);
+                    buf.append(&b, sizeof(bool));
+                    break;
+                }
+                case 'c': {
+                    m_log->trace("Parsing char");
+                    char* res;
+                    if(PyUnicode_Check(word)) {
+                        res = PyBytes_AS_STRING(
+                            PyUnicode_AsEncodedString(word,
+                                                      "UTF-8",
+                                                      "strict"));
+                    } else {
+                        res = PyBytes_AsString(word);
+                    }
+                    if(res) {
+                        buf.append(res, strnlen(res, 1));
+                    }
+                    break;
+                }
+                default:
+                    m_log->warn("Unsupported Return type from function");
+                    break;
+            }
+            m_return_values.push_back(buf);
         }
         return;
-        // schedule_contract();
     }
-
-    void py_runner::get_value_at(runtime_locking_shard::key_type key) {
-        // auto success =
-        m_try_lock_callback(std::move(key), // try locking the key
-                            broker::lock_type::read,
-                            [&](auto res) {
-                                handle_try_lock(res);
-                            });
-
-        /*
-        Need to follow how the lua runner does it:
-        - pushes value to lua state
-        - calls again ("resumes")
-        - Need to do this in an orderly way such that the value is finalized
-            upon accessing it
-        */
-
-        /*
-         How about try:
-         Ask for value k:
-         if k not contianed in set of requested values, add it to the set
-         if k contained: wait (?)
-        */
-
-        // if(!success) {
-        //     m_log->error("Failed to issue try lock command");
-        //     m_result_callback(error_code::internal_error);
-        //     // return cbdc::buffer(); // this should be an error
-        // }
-        // else {
-        //     if(!m_return_values.size()) {
-        //         return cbdc::buffer();
-        //     }
-        //     auto ret = m_return_values[0];
-        //     m_return_values.pop_back();
-        //     return ret; // this should be what comes from the shard?
-        // }
-    }
-
-    // auto py_runner::check_sig(lua_State* L) -> int {
-    //     return 0;
-    // }
 }
