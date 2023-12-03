@@ -44,7 +44,6 @@ namespace cbdc::parsec::runtime_locking_shard {
         /// Get m_tickets
         auto get_ticket_data() -> tickets_type;
 
-
       private:
         mutable std::mutex m_mut;
         state_type m_state;

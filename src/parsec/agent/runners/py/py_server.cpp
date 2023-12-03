@@ -16,9 +16,9 @@
 
 namespace cbdc::parsec::agent::rpc {
     py_server::py_server(std::unique_ptr<server_type> srv,
-                   std::shared_ptr<broker::interface> broker,
-                   std::shared_ptr<logging::log> log,
-                   const cbdc::parsec::config& cfg)
+                         std::shared_ptr<broker::interface> broker,
+                         std::shared_ptr<logging::log> log,
+                         const cbdc::parsec::config& cfg)
         : server_interface(std::move(broker), std::move(log), cfg),
           m_srv(std::move(srv)) {
         m_srv->register_handler_callback(
@@ -37,10 +37,10 @@ namespace cbdc::parsec::agent::rpc {
         return m_srv->init();
     }
 
-    auto py_server::request_handler(request req,
-                                 server_type::response_callback_type callback)
+    auto
+    py_server::request_handler(request req,
+                               server_type::response_callback_type callback)
         -> bool {
-        m_log->warn("py_server received request");
         auto id = m_next_id++;
         auto a = [&]() {
             auto agent = std::make_shared<impl>(

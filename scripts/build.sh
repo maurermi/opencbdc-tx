@@ -27,5 +27,5 @@ elif [[ "$BUILD_PROFILING" == "1" ]]; then
     CMAKE_BUILD_TYPE="Profiling"
 fi
 
-eval "cmake -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} ${CMAKE_FLAGS} -DCMAKE_CXX_COMPILER_LAUNCHER=ccache .."
+eval "cmake -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} ${CMAKE_FLAGS} .."
 make -j$CPUS

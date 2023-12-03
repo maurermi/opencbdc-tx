@@ -331,12 +331,12 @@ namespace cbdc::parsec::agent {
             get_param(),
             m_is_readonly_run,
             [this](const runner::interface::run_return_type& run_res) {
-                handle_run(run_res);                        // ----------------------------- RESULT CALLBACK
+                handle_run(run_res);
             },
             [this](broker::key_type key,
                    broker::lock_type locktype,
                    broker::interface::try_lock_callback_type res_cb) -> bool {
-                return do_try_lock_request(std::move(key), // ------------------------------------------------- TRY LOCK CALLBACK
+                return do_try_lock_request(std::move(key),
                                            locktype,
                                            std::move(res_cb));
             },
@@ -345,7 +345,6 @@ namespace cbdc::parsec::agent {
             m_ticket_number.value());
         auto run_res = m_runner->run();
         if(!run_res) {
-            // telemetry_log("agent_handle_function", 2, start);
             m_state = state::function_failed;
             m_log->error("Failed to start contract execution");
             m_result = error_code::function_execution;

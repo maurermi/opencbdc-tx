@@ -15,36 +15,28 @@
 #include <secp256k1_schnorrsig.h>
 
 namespace cbdc::parsec {
-    account_wallet::account_wallet(std::shared_ptr<logging::log> log,
+    pybench_wallet::pybench_wallet(std::shared_ptr<logging::log> log,
                                    std::shared_ptr<broker::interface> broker,
                                    std::shared_ptr<agent::rpc::client> agent,
                                    cbdc::buffer pay_contract_key,
-                                   std::string account_name)
+                                   std::string pubkey)
         : m_log(std::move(log)),
           m_agent(std::move(agent)),
           m_broker(std::move(broker)),
-          m_pay_contract_key(std::move(pay_contract_key),
-          m_pubkey(account_name)) {
-        auto rnd = cbdc::random_source(cbdc::config::random_source);
-        // generate some random public key private key pairing
-        m_pubkey = cbdc::pubkey_from_privkey(m_privkey, m_secp.get());
-
-        // stashes will be prefixed with "stash_"
-        constexpr auto account_prefix = "account_";
-        m_account_key.append(account_prefix, std::strlen(account_prefix));
-        m_account_key.append(m_pubkey.data(), m_pubkey.size());
+          m_pay_contract_key(pay_contract_key) {
+        m_account_key = runtime_locking_shard::key_type();
+        m_account_key.append(pubkey.c_str(), pubkey.size() + 1);
     }
 
-    auto account_wallet::init(uint64_t value,
+    auto pybench_wallet::init(uint64_t value,
                               const std::function<void(bool)>& result_callback)
         -> bool {
-        // initialize an account with "value" moneys
-        auto init_account = cbdc::buffer();
-        auto ser = cbdc::buffer_serializer(init_account);
-        ser << value << m_sequence;
+        auto init_val = runtime_locking_shard::value_type();
+        init_val.append(std::to_string(value).c_str(),
+                        std::to_string(value).length() + 1);
         auto res = put_row(m_broker,
                            m_account_key,
-                           init_account,
+                           init_val,
                            [&, result_callback, value](bool ret) {
                                if(ret) {
                                    m_balance = value;
@@ -54,68 +46,41 @@ namespace cbdc::parsec {
         return res;
     }
 
-    auto account_wallet::pay(pubkey_t to,
-                             uint64_t amount,
-                             const std::function<void(bool)>& result_callback)
-        -> bool {
-        if(amount > m_balance) {
-            return false;
-        }
-        auto params = make_pay_params(to, amount);
-        return execute_params(params, false, result_callback);
+    auto pybench_wallet::get_balance() const -> uint64_t {
+        return m_balance;
     }
 
-    auto account_wallet::update_balance(
-        const std::function<void(bool)>& result_callback) -> bool {
-        auto params = make_pay_params(pubkey_t{}, 0);
-        return execute_params(params, false, result_callback);
+    auto pybench_wallet::get_account_key() const
+        -> runtime_locking_shard::key_type {
+        return m_account_key;
     }
 
-    auto account_wallet::make_pay_params(key_type to, uint64_t amount) const
-        -> cbdc::buffer {
-        auto params = cbdc::buffer();
+    auto pybench_wallet::make_pay_params(runtime_locking_shard::key_type to,
+                                         uint64_t amount) const
+        -> cbdc::parsec::pybuffer::pyBuffer {
+        auto params = cbdc::parsec::pybuffer::pyBuffer();
+
+        // User defined input parameters
+        params.appendNumeric<uint64_t>(amount);
+        params.endSection();
+
+        // Input parameters stored in shards
+        params.append(m_account_key.data(), m_account_key.size());
         params.append(to.data(), to.size());
-        params.append(&amount, sizeof(amount));
-        // params.append(m_pubkey.data(), m_pubkey.size());
-        // params.append(to.data(), to.size());
-        // params.append(&amount, sizeof(amount));
-        // params.append(&m_sequence, sizeof(m_sequence));
+        params.endSection();
 
-
-        // // below may need to change based on crypto env
-        // auto sig_payload = cbdc::buffer();
-        // sig_payload.append(to.data(), to.size());
-        // sig_payload.append(&amount, sizeof(amount));
-        // sig_payload.append(&m_sequence, sizeof(m_sequence));
-
-        // auto sha = CSHA256();
-        // sha.Write(sig_payload.c_ptr(), sig_payload.size());
-        // auto sighash = cbdc::hash_t();
-        // sha.Finalize(sighash.data());
-
-        // secp256k1_keypair keypair{};
-        // [[maybe_unused]] auto ret = secp256k1_keypair_create(m_secp.get(),
-        //                                                      &keypair,
-        //                                                      m_privkey.data());
-
-        // cbdc::signature_t sig{};
-        // ret = secp256k1_schnorrsig_sign(m_secp.get(),
-        //                                 sig.data(),
-        //                                 sighash.data(),
-        //                                 &keypair,
-        //                                 nullptr,
-        //                                 nullptr);
-        // params.append(sig.data(), sig.size());
-        // // --
+        // Ouptut parameters to be stoed in shards
+        params.append(m_account_key.data(), m_account_key.size());
+        params.append(to.data(), to.size());
+        params.endSection();
 
         return params;
     }
 
-    auto account_wallet::execute_params(
-        cbdc::buffer params,
+    auto pybench_wallet::execute_params(
+        cbdc::parsec::pybuffer::pyBuffer params,
         bool dry_run,
         const std::function<void(bool)>& result_callback) -> bool {
-        // send the params and contract key to agent
         auto send_success = m_agent->exec(
             m_pay_contract_key,
             std::move(params),
@@ -123,28 +88,29 @@ namespace cbdc::parsec {
             [&, result_callback](agent::interface::exec_return_type res) {
                 auto success = std::holds_alternative<agent::return_type>(res);
                 if(success) {
-                    // this will change based on payload layout (probably processing a tuple)
                     auto updates = std::get<agent::return_type>(res);
                     auto it = updates.find(m_account_key);
                     assert(it != updates.end());
-                    auto deser = cbdc::buffer_serializer(it->second);
-                    deser >> m_balance >> m_sequence;
+                    m_balance = std::stoi(it->second.c_str());
+                    m_log->trace("Balance of:",
+                                 m_account_key.c_str(),
+                                 ":",
+                                 m_balance);
                 }
                 result_callback(success);
             });
         return send_success;
     }
 
-    auto account_wallet::get_balance() const -> uint64_t {
-        return m_balance; // cached value
+    auto
+    pybench_wallet::pay(runtime_locking_shard::key_type to,
+                        uint64_t amount,
+                        const std::function<void(bool)>& result_callback) // 2
+        -> bool {
+        if(amount > m_balance) {
+            return false;
+        }
+        auto params = make_pay_params(to, amount);
+        return execute_params(params, false, result_callback);
     }
-
-    auto account_wallet::get_pubkey() const -> pubkey_t {
-        return m_pubkey;
-    }
-
-    // auto account_wallet::get_stash_id() const -> cbdc::buffer {
-    //     constexpr auto stash_prefix = "stash_";
-
-    // }
 }

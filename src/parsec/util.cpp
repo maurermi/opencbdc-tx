@@ -204,29 +204,24 @@ namespace cbdc::parsec {
                    begin_ret)) {
                 result_callback(false);
                 return;
-            } // Make sure a ticket was recieved
+            }
 
             auto ticket_number
                 = std::get<cbdc::parsec::ticket_machine::ticket_number_type>(
                     begin_ret);
-            auto lock_res = broker->try_lock( // Acquire a write lock on the
-                                              // key
+            auto lock_res = broker->try_lock(
                 ticket_number,
                 key,
                 cbdc::parsec::runtime_locking_shard::lock_type::write,
-                [=](auto try_lock_res) { // this is the result_callback ->
-                                         // called in handle_lock on success
-                                         // contains locking_shard::value_type
+                [=](auto try_lock_res) {
                     if(!std::holds_alternative<cbdc::buffer>(try_lock_res)) {
                         result_callback(false);
                         return;
                     }
-                    auto commit_res = broker->commit( // commit actually frees
-                                                      // locks also
+                    auto commit_res = broker->commit(
                         ticket_number,
-                        {{key, value}},        // write this key value pair
-                        [=](auto commit_ret) { // result callback called by
-                                               // do_commit or do_prepare
+                        {{key, value}},
+                        [=](auto commit_ret) {
                             if(commit_ret.has_value()) {
                                 result_callback(false);
                                 return;
@@ -234,11 +229,7 @@ namespace cbdc::parsec {
                             auto finish_res = broker->finish(
                                 ticket_number,
                                 [=](auto finish_ret) {
-                                    result_callback(
-                                        !finish_ret
-                                             .has_value()); // called in finish
-                                                            // and possibly
-                                                            // handle_finish
+                                    result_callback(!finish_ret.has_value());
                                 });
                             if(!finish_res) {
                                 result_callback(false);
@@ -267,7 +258,6 @@ namespace cbdc::parsec {
         std::promise<cbdc::parsec::broker::interface::try_lock_return_type>
             res_promise;
         auto res_future = res_promise.get_future();
-        // auto begin_res =
         broker->begin([&](auto begin_ret) {
             if(!std::holds_alternative<
                    cbdc::parsec::ticket_machine::ticket_number_type>(
@@ -278,19 +268,16 @@ namespace cbdc::parsec {
                 result_callback(cbdc::parsec::broker::interface::error_code::
                                     ticket_number_assignment);
                 return;
-            } // Make sure a ticket was recieved
+            }
 
             auto ticket_number
                 = std::get<cbdc::parsec::ticket_machine::ticket_number_type>(
                     begin_ret);
-            auto lock_res = broker->try_lock( // Acquire a write lock on the
-                                              // key
+            auto lock_res = broker->try_lock(
                 ticket_number,
                 key,
                 cbdc::parsec::runtime_locking_shard::lock_type::read,
-                [&](auto try_lock_res) { // this is the result_callback ->
-                                         // called in handle_lock on success
-                                         // contains locking_shard::value_type
+                [&](auto try_lock_res) {
                     if(!std::holds_alternative<cbdc::buffer>(try_lock_res)) {
                         res_promise.set_value(
                             cbdc::parsec::broker::interface::error_code::
@@ -300,15 +287,12 @@ namespace cbdc::parsec {
                         return;
                     }
                     res_promise.set_value(try_lock_res);
-                    result_callback(
-                        try_lock_res); // this is what we actually want called
+                    result_callback(try_lock_res);
 
                     auto commit_res = broker->commit(
                         ticket_number,
-                        runtime_locking_shard::
-                            state_update_type(), // commit no updates
-                        [=](auto commit_ret) {   // result callback called by
-                                                 // do_commit or do_prepare
+                        runtime_locking_shard::state_update_type(),
+                        [=](auto commit_ret) {
                             if(commit_ret.has_value()) {
                                 if(std::holds_alternative<
                                        cbdc::parsec::broker::interface::
@@ -331,8 +315,7 @@ namespace cbdc::parsec {
                                 [=](auto finish_ret) {
                                     if(finish_ret.has_value()) {
                                         result_callback(finish_ret.value());
-                                    } // called in finish and possibly
-                                      // handle_finish
+                                    }
                                 });
                             if(!finish_res) {
                                 result_callback(

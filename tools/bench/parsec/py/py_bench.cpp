@@ -5,11 +5,14 @@
 
 #include "crypto/sha256.h"
 #include "parsec/agent/client.hpp"
+#include "parsec/agent/runners/py/pybuffer.hpp"
+#include "parsec/agent/runners/py/pyutil.hpp"
 #include "parsec/broker/impl.hpp"
 #include "parsec/directory/impl.hpp"
 #include "parsec/runtime_locking_shard/client.hpp"
 #include "parsec/ticket_machine/client.hpp"
 #include "parsec/util.hpp"
+#include "wallet.hpp"
 
 #include <Python.h>
 #include <iostream>
@@ -17,41 +20,8 @@
 #include <string>
 #include <thread>
 
-namespace pythoncontracts {
-    /*
-    , = delimiter between values
-    | = delimiter between header region
-    return_types | return_args | input_args | function
-    */
-
-    std::string firefox_key = "firefox";
-    std::string firefox
-        = "s|website1,|website1,website2,|import webbrowser\n"
-          "firefox = webbrowser.Mozilla(\"/usr/bin/firefox\")\n"
-          "firefox.open(website1)\n"
-          "print(website2)\n"
-          "firefox.open(website2)\n"
-          "website1 = 100";
-
-    std::string arbitrary_update_key = "arbitrary_update";
-    std::string arbitrary_update
-        = "account = \"0x3B2F51dad57e4160fd51DdB9A502c320B3f6363f\"\n"
-          "new_balance = 100\n";
-
-    std::string mult_key = "multiply";
-    std::string multiply = "c = a * b\n"
-                           "return c";
-
-    std::string stash
-        = "from Crypto.PublicKey import RSA\n"
-          "from hashlib import sha512\n"
-          "amount_hash = int.from_bytes(sha512(bytes(str(amount), "
-          "'ascii')).digest(), byteorder='big')\n"
-          "return (sender_balance - amount, amount_hash, pow(amount_hash, "
-          "reciever_pk[1], reciever_pk[0]))\n";
-}
-
 auto main(int argc, char** argv) -> int {
+    // SETUP START
     auto log = std::make_shared<cbdc::logging::log>(
         cbdc::logging::log_level::trace);
 
@@ -103,128 +73,6 @@ auto main(int argc, char** argv) -> int {
         directory,
         log);
 
-    std::thread ticket_state_logger([&broker] {
-        while(true) {
-            broker->log_tickets();
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
-    });
-    ticket_state_logger.detach();
-
-    auto pay_contract = cbdc::buffer();
-    // std::string contract
-    //     = "import webbrowser\n"
-    //       "firefox = webbrowser.Mozilla(\"/usr/bin/firefox\")\n"
-    //       "firefox.open(website)\n";
-    pay_contract.append(pythoncontracts::firefox.c_str(),
-                        pythoncontracts::firefox.size());
-
-    auto init_error = std::atomic_bool{false};
-    auto init_count = std::atomic<size_t>();
-
-    auto pay_contract_key = cbdc::buffer();
-    pay_contract_key.append(pythoncontracts::firefox_key.c_str(),
-                            pythoncontracts::firefox_key.size());
-
-    log->info("Inserting pay contract");
-    auto ret = cbdc::parsec::put_row(broker,
-                                     pay_contract_key,
-                                     pay_contract,
-                                     [&](bool res) {
-                                         if(!res) {
-                                             init_error = true;
-                                         } else {
-                                             log->info("Inserted pay contract",
-                                                       pay_contract.c_str());
-                                             init_count++;
-                                         }
-                                     });
-    if(!ret) {
-        init_error = true;
-    }
-    std::this_thread::sleep_for(std::chrono::seconds(10));
-
-    std::string michael = "michael";
-    auto k = cbdc::buffer();
-    k.append(michael.c_str(), michael.size());
-    auto v = cbdc::buffer();
-    v.append("abcde", 5);
-    auto f = cbdc::parsec::put_row(broker, k, v, [&](bool res) {
-        if(!res) {
-            log->info("Did not insert michael");
-        } else {
-            log->info("Inserted michael");
-        }
-    });
-    if(!f) {
-        init_error = true;
-    }
-
-    std::this_thread::sleep_for(std::chrono::seconds(10));
-    auto return_value = cbdc::buffer();
-    auto val = cbdc::parsec::get_row(
-        broker,
-        k,
-        [&](cbdc::parsec::broker::interface::try_lock_return_type res) {
-            if(std::holds_alternative<
-                   cbdc::parsec::runtime_locking_shard::value_type>(res)) {
-                auto r = std::get<
-                    cbdc::parsec::runtime_locking_shard::value_type>(res);
-                log->trace("Found this (callback):", r.c_str());
-                return_value = r;
-            } else {
-                log->error("get row callback recieved error");
-            }
-        });
-    std::this_thread::sleep_for(std::chrono::seconds(10));
-    if(std::holds_alternative<cbdc::parsec::runtime_locking_shard::value_type>(
-           val)) {
-        log->trace(
-            "Found this:",
-            std::get<cbdc::parsec::runtime_locking_shard::value_type>(val)
-                .c_str());
-    } else {
-        log->trace("Something went wrong");
-    }
-
-    constexpr uint64_t timeout = 30;
-
-    constexpr auto wait_time = std::chrono::seconds(1);
-    for(size_t count = 0; init_count < 1 && !init_error && count < timeout;
-        count++) {
-        std::this_thread::sleep_for(wait_time);
-    }
-    if(init_error || init_count < 1) {
-        log->error("Error adding pay contract");
-        return 2;
-    }
-    // init_count = 0;
-
-    // pay_contract = cbdc::buffer();
-    // pay_contract.append(pythoncontracts::arbitrary_update.c_str(),
-    //                     pythoncontracts::arbitrary_update.size());
-    // pay_contract_key = cbdc::buffer();
-    // pay_contract_key.append(pythoncontracts::arbitrary_update_key.c_str(),
-    //                         pythoncontracts::arbitrary_update_key.size());
-
-    // log->info("Inserting arbitrary pay contract");
-    // ret = cbdc::parsec::put_row(broker,
-    //                             pay_contract_key,
-    //                             pay_contract,
-    //                             [&](bool res) {
-    //                                 if(!res) {
-    //                                     init_error = true;
-    //                                 } else {
-    //                                     log->info(
-    //                                         "Inserted arbitrary pay
-    //                                         contract");
-    //                                     init_count++;
-    //                                 }
-    //                             });
-    // if(!ret) {
-    //     init_error = true;
-    // }
-
     auto agents
         = std::vector<std::shared_ptr<cbdc::parsec::agent::rpc::client>>();
     for(auto& a : cfg->m_agent_endpoints) {
@@ -238,131 +86,260 @@ auto main(int argc, char** argv) -> int {
         }
         agents.emplace_back(agent);
     }
-    auto params = cbdc::buffer();
+    // SETUP END
 
-    std::string website = "bing.com";
-    // std::cout << "Enter website name: ";
-    // std::cin >> website;
+    // TICKET LOGGER STARTING
+    std::atomic_bool running = true;
+    std::thread ticket_state_logger([&broker, &running] {
+        while(running) {
+            broker->log_tickets();
+            std::this_thread::sleep_for(std::chrono::seconds(10));
+        }
+    });
+    ticket_state_logger.detach();
+    // TICKET LOGGER STARTED
 
-    params.append(website.c_str(), website.length() + 1);
-    params.append("python.org\0", 11);
-    auto r = agents[0]->exec(
+    // REGISTERING PAY CONTRACT
+    auto pay_contract = cbdc::parsec::pybuffer::pyBuffer();
+    auto contract_code = cbdc::parsec::pyutils::formContract(
+        "scripts/paycontract.py",
+        "scripts/pythonContractConverter.py",
+        "pay");
+    pay_contract.appendString(contract_code);
+
+    auto init_error = std::atomic_bool{false};
+
+    const std::string pay_key = "pay_contract";
+    auto pay_contract_key = cbdc::buffer();
+    pay_contract_key.append(pay_key.c_str(), pay_key.size());
+
+    log->info("Inserting pay contract");
+
+    auto prom_contract_placed = std::promise<void>();
+    auto contract_emplaced = cbdc::parsec::put_row(
+        broker,
         pay_contract_key,
-        params,
-        false,
-        [&](cbdc::parsec::agent::interface::exec_return_type res) {
-            auto success
-                = std::holds_alternative<cbdc::parsec::agent::return_type>(
-                    res);
-            if(success) {
-                log->info("success!");
+        pay_contract,
+        [&](bool res) {
+            if(res) {
+                log->info("Inserted pay contract", pay_contract.c_str());
+                prom_contract_placed.set_value();
+            } else {
+                init_error = true;
+                prom_contract_placed.set_value();
             }
-            log->info("no success :(");
         });
-    if(!r) {
-        log->error("exec error");
+    if(!contract_emplaced) {
+        init_error = true;
     }
-    // std::this_thread::sleep_for(std::chrono::seconds(20));
-    // log->trace("doing it again");
-    // r = agents[0]->exec(
-    //     pay_contract_key,
-    //     params,
-    //     false,
-    //     [&](cbdc::parsec::agent::interface::exec_return_type res) {
-    //         auto success
-    //             = std::holds_alternative<cbdc::parsec::agent::return_type>(
-    //                 res);
-    //         if(success) {
-    //             log->info("success!");
-    //         }
-    //         log->info("no success :(");
-    //     });
-    // if(!r) {
-    //     log->error("exec error");
-    // }
-    // cbdc::buffer result = get_value_at(michael);
+    auto fut_contract_placed
+        = prom_contract_placed.get_future().wait_for(std::chrono::seconds(10));
+    if(init_error || fut_contract_placed != std::future_status::ready) {
+        log->error("Error placing contract");
+        return 2;
+    }
 
-    // make some accounts
+    const std::vector<std::string> names
+        = {"Alice", "Bob",    "Charlie",  "Diane",   "Edgar",   "Frank",
+           "Greg",  "Henri",  "Isabelle", "Jessica", "Kathryn", "Laura",
+           "Mike",  "Noelle", "Oscar",    "Patrick", "Quentin", "Rachel",
+           "Sarah", "Tom",    "Ulysses",  "Victor",  "Walter",  "Xander",
+           "Yana",  "Zach"};
 
-    // params = cbdc::buffer();
-    // pay_contract = cbdc::buffer();
-    // pay_contract.append(pythoncontracts::arbitrary_update.c_str(),
-    //                     pythoncontracts::arbitrary_update.size());
-    // pay_contract_key = cbdc::buffer();
-    // pay_contract_key.append(pythoncontracts::arbitrary_update_key.c_str(),
-    //                         pythoncontracts::arbitrary_update_key.size());
-    // log->info(pythoncontracts::arbitrary_update.c_str());
-    // log->info(pythoncontracts::arbitrary_update_key.c_str());
-    // log->info("Inserting arbitrary pay contract");
-    // ret = cbdc::parsec::put_row(broker,
-    //                             pay_contract_key,
-    //                             pay_contract,
-    //                             [&](bool res) {
-    //                                 if(!res) {
-    //                                     init_error = true;
-    //                                 } else {
-    //                                     log->info(
-    //                                         "Inserted arbitrary pay
-    //                                         contract");
-    //                                     init_count++;
-    //                                 }
-    //                             });
-    // if(!ret) {
-    //     init_error = true;
-    //     log->error("init error");
-    // }
-    // for(size_t count = 0; init_count < 1 && !init_error && count < timeout;
-    //     count++) {
-    //     std::this_thread::sleep_for(wait_time);
-    // }
-    // if(init_error || init_count < 1) {
-    //     log->error("Error adding pay contract");
-    //     return 2;
-    // }
+    auto init_count = std::atomic<size_t>();
 
-    // log->info("calling exec");
-    // auto r = agents[0]->exec(
-    //     pay_contract_key,
-    //     params,
-    //     false,
-    //     [&](cbdc::parsec::agent::interface::exec_return_type res) {
-    //         auto success
-    //             = std::holds_alternative<cbdc::parsec::agent::return_type>(
-    //                 res);
-    //         log->trace("measuring success");
-    //         if(success) {
-    //             auto updates =
-    //             std::get<cbdc::parsec::agent::return_type>(res); auto buf =
-    //             cbdc::buffer();
-    //             buf.append("0x3B2F51dad57e4160fd51DdB9A502c320B3f6363f",
-    //             43); auto it = updates.find(buf); log->trace("finding");
-    //             assert(it != updates.end());
-    //             log->trace("success 238");
-    //         } else {
-    //             log->trace("error");
-    //         }
-    //     });
-    // if(!r) {
-    //     log->error("exec error");
-    // }
-    // std::this_thread::sleep_for(std::chrono::seconds(15));
-    // auto k = cbdc::buffer();
-    // k.append("some key", 8);
-    // auto return_value = cbdc::buffer();
-    // ret = cbdc::parsec::get_row(broker, k,
-    // [&](cbdc::parsec::broker::interface::try_lock_return_type res) {
-    //     if(std::holds_alternative<
-    //            cbdc::parsec::runtime_locking_shard::value_type>(res)) {
-    //         auto cb_res =
-    //         std::get<cbdc::parsec::runtime_locking_shard::value_type>(res);
-    //         log->trace("Found this (callback):", cb_res.c_str());
-    //         return_value = cb_res;
-    //     }
-    //     else {
-    //         log->error("get row callback recieved error");
-    //     }
-    // });
-    // std::this_thread::sleep_for(std::chrono::seconds(10));
-    // log->trace("Found this:", return_value.c_str());
+    std::vector<cbdc::parsec::pybench_wallet> wallets;
+
+    /// \todo Read this in from config
+    size_t n_wallets = 26;
+
+    for(size_t i = 0; i < n_wallets; i++) {
+        auto walletName
+            = names[i % names.size()] + std::to_string(i / names.size());
+        wallets.push_back(
+            cbdc::parsec::pybench_wallet(log,
+                                         broker,
+                                         agents[i % agents.size()],
+                                         pay_contract_key,
+                                         walletName));
+    }
+    auto init_balance = 1000;
+    for(cbdc::parsec::pybench_wallet& wal : wallets) {
+        auto res = wal.init(init_balance, [&](bool ret) {
+            if(!ret) {
+                init_error = true;
+            } else {
+                init_count++;
+            }
+        });
+        if(!res) {
+            init_error = true;
+            break;
+        }
+    }
+
+    constexpr uint64_t timeout = 300;
+    constexpr auto wait_time = std::chrono::seconds(1);
+    for(size_t count = 0;
+        init_count < n_wallets && !init_error && count < timeout;
+        count++) {
+        std::this_thread::sleep_for(wait_time);
+    }
+    if(init_count < n_wallets || init_error) {
+        log->error("Error initializing accounts");
+        return 1;
+    }
+    // WALLETS INITIALIZED
+
+    // RUN A BENCH TEST
+    auto pay_queue = cbdc::blocking_queue<size_t>();
+    auto pay_times = std::vector<std::atomic<uint64_t>>(n_wallets);
+    for(size_t i = 0; i < n_wallets; i++) {
+        pay_queue.push(i);
+        pay_times[i] = std::chrono::high_resolution_clock::now()
+                           .time_since_epoch()
+                           .count();
+    }
+
+    auto rng_seed
+        = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    auto rng = std::default_random_engine(rng_seed);
+    auto dist = std::uniform_int_distribution<size_t>(0, wallets.size() - 1);
+    auto running_test = std::atomic_bool(true);
+    auto in_flight = std::atomic<size_t>();
+    auto total_tx = std::atomic<size_t>(0);
+
+    auto thread_count = (n_wallets < std::thread::hardware_concurrency()
+                             ? n_wallets
+                             : std::thread::hardware_concurrency());
+    log->trace("Thread count:", thread_count);
+    auto threads = std::vector<std::thread>();
+    for(size_t i = 0; i < thread_count; i++) {
+        auto t = std::thread([&]() {
+            size_t from{};
+            while(pay_queue.pop(from)) {
+                size_t to{};
+                do {
+                    to = dist(rng);
+                } while(from == to);
+                auto to_key = wallets[to].get_account_key();
+
+                log->trace("Paying from",
+                           wallets[from].get_account_key().c_str(),
+                           "to",
+                           wallets[to].get_account_key().c_str());
+                auto tx_start = std::chrono::high_resolution_clock::now();
+                pay_times[from] = tx_start.time_since_epoch().count();
+
+                in_flight++;
+                auto res = wallets[from].pay(
+                    to_key,
+                    10,
+                    [&, tx_start, from, to](bool ret) { // 3
+                        if(!ret) {
+                            log->fatal("Pay request error");
+                        }
+                        auto tx_end
+                            = std::chrono::high_resolution_clock::now();
+                        const auto tx_delay = tx_end - tx_start;
+                        log->trace("Done paying from",
+                                   wallets[from].get_account_key().c_str(),
+                                   "to",
+                                   wallets[to].get_account_key().c_str(),
+                                   " Delay: ",
+                                   tx_delay.count() / 1000000,
+                                   "ms.");
+                        total_tx++;
+                        if(running_test) {
+                            pay_queue.push(from);
+                        }
+                        in_flight--;
+                    });
+                if(!res) {
+                    log->fatal("Pay request failed");
+                }
+            }
+        });
+        threads.emplace_back(std::move(t));
+    }
+
+    auto start_time = std::chrono::high_resolution_clock::now();
+    constexpr auto test_duration = std::chrono::minutes(1);
+    while(in_flight > 0 || running_test) {
+        auto now = std::chrono::high_resolution_clock::now();
+        uint64_t now_count = now.time_since_epoch().count();
+        for(auto& pay_time : pay_times) {
+            constexpr uint64_t nano_factor = 1000000000;
+            constexpr uint64_t max_delay = timeout * nano_factor;
+            auto payt = pay_time.load();
+            if(payt > now_count) {
+                continue;
+            }
+            auto delay = now_count - payt;
+            if(delay > max_delay) {
+                log->fatal("Pay request timed out");
+            }
+        }
+        if(now - start_time > test_duration) {
+            running_test = false;
+        }
+        std::this_thread::sleep_for(wait_time);
+    }
+
+    log->trace("Joining thread");
+    pay_queue.clear();
+    for(auto& t : threads) {
+        t.join();
+    }
+
+    log->trace("Checking balances");
+
+    auto tot = std::atomic<uint64_t>{};
+    init_count = 0;
+    init_error = false;
+    log->trace("AGGREGATING VALUES:");
+    for(size_t i = 0; i < n_wallets; i++) {
+        cbdc::parsec::get_row(
+            broker,
+            wallets[i].get_account_key(),
+            [&](cbdc::parsec::broker::interface::try_lock_return_type res) {
+                if(std::holds_alternative<
+                       cbdc::parsec::runtime_locking_shard::value_type>(res)) {
+                    auto found = std::get<
+                        cbdc::parsec::runtime_locking_shard::value_type>(res);
+                    tot += std::stoi(found.c_str());
+                    log->trace(wallets[i].get_account_key().c_str(),
+                               " balance: ",
+                               found.c_str());
+                    init_count++;
+                } else {
+                    log->fatal("Getting account returned error");
+                }
+            });
+    }
+
+    for(size_t count = 0;
+        init_count < n_wallets && !init_error && count < timeout;
+        count++) {
+        std::this_thread::sleep_for(wait_time);
+    }
+
+    if(init_count < n_wallets || init_error) {
+        log->error("Error updating balances");
+        return 2;
+    }
+
+    if(tot != init_balance * n_wallets) {
+        log->error("End balance does not equal start balance");
+        log->error("Start Balance:",
+                   init_balance * n_wallets,
+                   "End Balance:",
+                   tot);
+        return 3;
+    }
+
+    log->trace("Balances check out");
+    log->trace(total_tx, "total transactions recorded in 1 minute.");
+    running = false;
     return 0;
 }

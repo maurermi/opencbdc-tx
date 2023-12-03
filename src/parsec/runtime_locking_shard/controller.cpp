@@ -116,7 +116,4 @@ namespace cbdc::parsec::runtime_locking_shard {
         m_logger->info("Recovered shard and started RPC server");
     }
 
-    void controller::log_tickets() {
-        m_state_machine->
-    }
 }
