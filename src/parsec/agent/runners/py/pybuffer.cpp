@@ -3,7 +3,7 @@
 #include <string>
 
 namespace cbdc::parsec::pybuffer {
-    void pyBuffer::appendString(const std::string data) {
+    void pyBuffer::appendString(const std::string& data) {
         this->append(data.c_str(), data.length() + 1);
     }
 
@@ -12,7 +12,7 @@ namespace cbdc::parsec::pybuffer {
         this->append("\0", 1);
     }
 
-    void pyBuffer::appendByteVector(const std::vector<std::byte> data) {
+    void pyBuffer::appendByteVector(const std::vector<std::byte>& data) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         auto dataStr = reinterpret_cast<const char*>(data.data());
         this->append(dataStr, data.size());

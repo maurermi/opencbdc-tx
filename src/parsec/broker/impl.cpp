@@ -73,7 +73,7 @@ namespace cbdc::parsec::broker {
 
     void impl::log_tickets() {
         m_log->trace("Logging tickets");
-        for(auto i : m_tickets) {
+        for(const auto& i : m_tickets) {
             auto i_state = i.second->m_state;
             switch(i_state) {
                 case ticket_state::begun:
@@ -788,7 +788,7 @@ namespace cbdc::parsec::broker {
             if(!m_shards[shard_idx]->try_lock(
                    ticket_number,
                    m_broker_id,
-                   key,
+                   std::move(key),
                    locktype,
                    first_lock,
                    [=](const parsec::runtime_locking_shard::interface::
