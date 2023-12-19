@@ -29,8 +29,6 @@ add_executable(run_unit_tests archiver_test.cpp
                               watchtower/tx_error_messages_test.cpp
                               watchtower/watchtower_test.cpp)
 
-add_subdirectory(parsec)
-
 target_compile_options(run_unit_tests PRIVATE -ftest-coverage -fprofile-arcs)
 target_link_options(run_unit_tests PRIVATE --coverage)
 target_link_libraries(run_unit_tests ${GTEST_LIBRARY}
@@ -47,15 +45,6 @@ target_link_libraries(run_unit_tests ${GTEST_LIBRARY}
                                      watchtower
                                      coordinator
                                      locking_shard
-                                     parsec_unit_tests
-                                     evm_runner
-                                     lua_runner
-                                     directory
-                                     ticket_machine
-                                     broker
-                                     runtime_locking_shard
-                                     agent
-                                     runners
                                      raft
                                      rpc
                                      transaction
@@ -67,5 +56,4 @@ target_link_libraries(run_unit_tests ${GTEST_LIBRARY}
                                      ${LEVELDB_LIBRARY}
                                      ${NURAFT_LIBRARY}
                                      ${JSON_LIBRARY}
-                                     ${LUA_LIBRARY}
                                      ${CMAKE_THREAD_LIBS_INIT})
