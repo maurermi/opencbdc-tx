@@ -39,8 +39,10 @@ namespace cbdc::network {
 
             static constexpr int one = 1;
             setsockopt(m_sock_fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)); // sending side. needed?
-            setsockopt(m_sock_fd, IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one)); // receiving side
-
+            #ifdef __linux__
+                setsockopt(m_sock_fd, IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one)); // receiving side
+            #endif
+            
             break;
         }
 
@@ -104,7 +106,9 @@ namespace cbdc::network {
             auto n = read(m_sock_fd,
                           &sz_buf.at(total_read),
                           sizeof(pkt_sz) - total_read);
-            setsockopt(m_sock_fd, IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one)); // receiving side
+            #ifdef __linux__
+                setsockopt(m_sock_fd, IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one)); // receiving side
+            #endif
             if(n <= 0) {
                 return false;
             }
@@ -119,7 +123,9 @@ namespace cbdc::network {
         while(total_read < pkt_sz) {
             const auto buf_sz = pkt_sz - total_read;
             auto n = read(m_sock_fd, buf.data(), buf_sz);
-            setsockopt(m_sock_fd, IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one)); // receiving side
+            #ifdef __linux__
+                setsockopt(m_sock_fd, IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one)); // receiving side
+            #endif
             if(n <= 0) {
                 return false;
             }

@@ -73,7 +73,7 @@ add_subdirectory(3rdparty)
 add_compile_options(-Wall
                     -Wextra
                     -pedantic
-                    -Werror
+                    #-Werror
                     -fno-exceptions)
 
 add_compile_definitions(_NO_EXCEPTION)
