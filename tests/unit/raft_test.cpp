@@ -173,10 +173,6 @@ class raft_test : public ::testing::Test {
         auto new_log
             = cbdc::make_buffer<uint64_t, nuraft::ptr<nuraft::buffer>>(1);
 
-        auto res = nodes[0]->replicate_sync(new_log);
-        ASSERT_TRUE(res.has_value());
-        ASSERT_EQ(nodes[0]->last_log_idx(), 2UL);
-
         cbdc::raft::callback_type result_fn = nullptr;
         auto result_done = std::atomic<bool>(false);
         if(!blocking) {
@@ -194,7 +190,14 @@ class raft_test : public ::testing::Test {
         while(!result_done) {
             std::this_thread::sleep_for(std::chrono::milliseconds(250));
         }
-        ASSERT_EQ(nodes[0]->last_log_idx(), 3UL);
+        ASSERT_EQ(nodes[0]->last_log_idx(), 2UL);
+
+        if(blocking) {
+            // Replicate sync will only return a value in the blocking context
+            auto res = nodes[0]->replicate_sync(new_log);
+            ASSERT_TRUE(res.has_value());
+            ASSERT_EQ(nodes[0]->last_log_idx(), 3UL);
+        }
 
         for(size_t i{0}; i < nodes.size(); i++) {
             ASSERT_EQ(nodes[i]->get_sm(), sms[i].get());

@@ -39,7 +39,7 @@ make -j$CPUS
 make install
 cd ..
 
-NURAFT_VERSION="1.3.0"
+NURAFT_VERSION="2.1.0"
 echo -e "${green}Building NuRaft from sources...${end}"
 wget https://github.com/eBay/NuRaft/archive/v${NURAFT_VERSION}.tar.gz
 rm -rf "NuRaft-${NURAFT_VERSION}-${CMAKE_BUILD_TYPE}"
