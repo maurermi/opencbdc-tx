@@ -5,6 +5,8 @@
 
 #include "node.hpp"
 
+#include <future>
+
 namespace cbdc::raft {
     node::node(int node_id,
                std::vector<network::endpoint_t> raft_endpoints,
@@ -99,11 +101,26 @@ namespace cbdc::raft {
     auto node::replicate_sync(const nuraft::ptr<nuraft::buffer>& new_log) const
         -> std::optional<nuraft::ptr<nuraft::buffer>> {
         auto ret = m_raft_instance->append_entries({new_log});
-        if(!ret->get_accepted()
-           || ret->get_result_code() != nuraft::cmd_result_code::OK) {
+        if(!ret->get_accepted()) {
             return std::nullopt;
         }
-
+        auto result_code = nuraft::cmd_result_code::RESULT_NOT_EXIST_YET;
+        auto blocking_promise = std::promise<void>();
+        auto blocking_future = blocking_promise.get_future();
+        ret->when_ready([&result_code,
+                         &blocking_promise](raft::result_type& r,
+                                            nuraft::ptr<std::exception>& err) {
+            if(err) {
+                result_code = nuraft::cmd_result_code::FAILED;
+            } else {
+                result_code = r.get_result_code();
+            }
+            blocking_promise.set_value();
+        });
+        blocking_future.wait();
+        if(result_code != nuraft::cmd_result_code::OK) {
+            return std::nullopt;
+        }
         return ret->get();
     }
 
