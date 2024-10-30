@@ -175,14 +175,14 @@ TEST(tcp_rpc_test, async_echo_test) {
     server.register_handler_callback(
         [](request req,
            std::function<void(std::optional<response>)> cb) -> bool {
-            std::thread([cb = std::move(cb), r = req]() {
+            std::thread([cb_inner = std::move(cb), r = req]() {
                 auto resp = response{};
                 std::visit(
                     [&](auto val) {
                         resp = val;
                     },
                     r);
-                cb(resp);
+                cb_inner(resp);
             }).detach();
             return true;
         });
@@ -229,8 +229,8 @@ TEST(tcp_rpc_test, async_error_test) {
         [](request req,
            std::function<void(std::optional<response>)> cb) -> bool {
             if(req) {
-                std::thread([cb = std::move(cb)]() {
-                    cb(std::nullopt);
+                std::thread([cb_inner = std::move(cb)]() {
+                    cb_inner(std::nullopt);
                 }).detach();
             }
             return req;

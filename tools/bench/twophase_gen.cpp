@@ -242,7 +242,7 @@ auto main(int argc, char** argv) -> int {
                                  .count();
 
             auto res_cb
-                = [&, txn = tx.value(), send_time = send_time](
+                = [&, txn = tx.value(), send_time](
                       cbdc::sentinel::rpc::client::execute_result_type res) {
                       auto tx_id = cbdc::transaction::tx_id(txn);
                       if(!res.has_value()) {
