@@ -18,6 +18,7 @@ COPY requirements.txt /opt/tx-processor/requirements.txt
 COPY scripts/activate-venv.sh /opt/tx-processor/scripts/activate-venv.sh
 COPY scripts/install-build-tools.sh /opt/tx-processor/scripts/install-build-tools.sh
 COPY scripts/setup-dependencies.sh /opt/tx-processor/scripts/setup-dependencies.sh
+COPY scripts/nuraft-missing-include.patch /opt/tx-processor/scripts/nuraft-missing-include.patch
 
 # Set working directory
 WORKDIR /opt/tx-processor

@@ -48,6 +48,13 @@ rm v${NURAFT_VERSION}.tar.gz
 mv NuRaft-${NURAFT_VERSION} "NuRaft-${NURAFT_VERSION}-${CMAKE_BUILD_TYPE}"
 cd "NuRaft-${NURAFT_VERSION}-${CMAKE_BUILD_TYPE}"
 ./prepare.sh
+set -x
+pwd
+ls
+ls ..
+ls ../scripts
+patch -p1 < ../scripts/nuraft-missing-include.patch
+set +x
 if [[ "$BUILD_RELEASE" == "1" ]]; then
     # If we're doing a release build, remove the examples and tests
     rm -rf examples tests
