@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.13)
 include(CheckCXXCompilerFlag)
 
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    message(STATUS "Using ccache: ${CCACHE_PROGRAM}")
+endif()
+
 project(opencbdc-tx)
 
 set(CMAKE_CXX_STANDARD 20)
