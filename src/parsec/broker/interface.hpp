@@ -79,7 +79,9 @@ namespace cbdc::parsec::broker {
             get_tickets_error,
             /// A commit is attempted without associating update keys with
             /// ticket
-            commit_hazard
+            commit_hazard,
+            /// Lock is not held for a given key
+            lock_not_held,
         };
 
         /// Return type from a begin operation. Either a new ticket number or

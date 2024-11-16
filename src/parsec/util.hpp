@@ -60,6 +60,13 @@ namespace cbdc::parsec {
     ///         while parsing the arguments.
     auto read_config(int argc, char** argv) -> std::optional<config>;
 
+    /// Reads the configuration parameters from the program arguments.
+    /// \param argc number of program arguments.
+    /// \param argv program arguments.
+    /// \return configuration parametrs or std::nullopt if there was an error
+    ///         while parsing the arguments.
+    auto read_tiny_config(int argc, char** argv) -> std::optional<config>;
+
     /// Asynchronously inserts the given row into the cluster.
     /// \param broker broker to use for inserting the row.
     /// \param key key at which to insert value.

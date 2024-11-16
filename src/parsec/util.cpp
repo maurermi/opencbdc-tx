@@ -192,6 +192,60 @@ namespace cbdc::parsec {
         return cfg;
     }
 
+    auto read_tiny_config(int argc, char** argv) -> std::optional<config> {
+        // TODO: refactor, make config parsing generic
+        auto opts = parse_args(argc, argv);
+        if(!opts.has_value()) {
+            return std::nullopt;
+        }
+
+        auto cfg = config{};
+
+        cfg.m_loglevel = logging::log_level::trace;
+        constexpr auto loglevel_key = "loglevel";
+        auto it = opts->find(loglevel_key);
+        if(it != opts->end()) {
+            auto maybe_loglevel = logging::parse_loglevel(it->second);
+            if(maybe_loglevel.has_value()) {
+                cfg.m_loglevel = maybe_loglevel.value();
+            }
+        }
+
+        auto agent_endpoints = read_endpoints(opts.value(), "agent");
+        if(!agent_endpoints.has_value()) {
+            return std::nullopt;
+        }
+        cfg.m_agent_endpoints = agent_endpoints.value();
+
+        constexpr auto loadgen_txtype_key = "loadgen_txtype";
+        it = opts->find(loadgen_txtype_key);
+        if(it != opts->end()) {
+            const auto& val = it->second;
+            if(val == "transfer") {
+                cfg.m_load_type = load_type::transfer;
+            } else if(val == "erc20") {
+                cfg.m_load_type = load_type::erc20;
+            } else {
+                return std::nullopt;
+            }
+        }
+
+        constexpr auto runner_type_key = "runner_type";
+        it = opts->find(runner_type_key);
+        if(it != opts->end()) {
+            const auto& val = it->second;
+            if(val == "evm") {
+                cfg.m_runner_type = runner_type::evm;
+            } else if(val == "lua") {
+                cfg.m_runner_type = runner_type::lua;
+            } else {
+                return std::nullopt;
+            }
+        }
+
+        return cfg;
+    }
+
     auto put_row(const std::shared_ptr<broker::interface>& broker,
                  broker::key_type key,
                  broker::value_type value,
