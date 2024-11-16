@@ -58,6 +58,7 @@ target_link_libraries(run_unit_tests ${GTEST_LIBRARY}
                                      runners
                                      raft
                                      rpc
+                                     json_rpc_http
                                      transaction
                                      network
                                      common
@@ -68,4 +69,5 @@ target_link_libraries(run_unit_tests ${GTEST_LIBRARY}
                                      ${NURAFT_LIBRARY}
                                      ${JSON_LIBRARY}
                                      ${LUA_LIBRARY}
-                                     ${CMAKE_THREAD_LIBS_INIT})
+                                     ${CMAKE_THREAD_LIBS_INIT}
+                                     ${MHD_LIBRARY})

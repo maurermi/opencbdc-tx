@@ -19,6 +19,9 @@ target_link_libraries(run_benchmarks ${GTEST_LIBRARY}
                                      watchtower
                                      locking_shard
                                      transaction
+                                     atomizer
+                                     archiver
+                                     raft
                                      rpc
                                      network
                                      common
@@ -26,4 +29,5 @@ target_link_libraries(run_benchmarks ${GTEST_LIBRARY}
                                      crypto
                                      secp256k1
                                      ${LEVELDB_LIBRARY}
+                                     ${NURAFT_LIBRARY}
                                      ${CMAKE_THREAD_LIBS_INIT})
