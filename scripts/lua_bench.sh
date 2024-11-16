@@ -1,7 +1,7 @@
 #!/bin/bash
 
 IP="localhost"
-PORT="8889"
+PORT="8888"
 N_WALLETS=5
 LOGLEVEL="WARN"
 
