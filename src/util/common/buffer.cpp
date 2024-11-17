@@ -45,6 +45,10 @@ namespace cbdc {
         return m_data == other.m_data;
     }
 
+    void buffer::resize(size_t len) {
+        m_data.resize(len);
+    }
+
     void buffer::extend(size_t len) {
         m_data.resize(m_data.size() + len);
     }

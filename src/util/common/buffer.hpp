@@ -49,6 +49,10 @@ namespace cbdc {
 
         auto operator==(const buffer& other) const -> bool;
 
+        /// Resizes the buffer to the given length.
+        /// \param new size of the buffer.
+        void resize(size_t len);
+
         /// Extends the size of the buffer by the given length.
         /// \param len the number of bytes to add.
         void extend(size_t len);
