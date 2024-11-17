@@ -92,7 +92,7 @@ namespace cbdc::sentinel_2pc {
         std::unique_ptr<cbdc::sentinel::rpc::async_server> m_rpc_server;
 
         std::unique_ptr<secp256k1_context,
-                        decltype(&secp256k1_context_destroy)>
+                        void(*)(secp256k1_context*)>
             m_secp{secp256k1_context_create(SECP256K1_CONTEXT_SIGN),
                    &secp256k1_context_destroy};
 

@@ -14,11 +14,13 @@ add_executable(watchtowerd watchtowerd.cpp)
 target_link_libraries(watchtowerd watchtower
                                   archiver
                                   atomizer
+                                  raft
                                   transaction
                                   network
                                   common
                                   serialization
                                   crypto
+                                  ${LEVELDB_LIBRARY}
                                   ${NURAFT_LIBRARY}
                                   secp256k1
                                   ${CMAKE_THREAD_LIBS_INIT})

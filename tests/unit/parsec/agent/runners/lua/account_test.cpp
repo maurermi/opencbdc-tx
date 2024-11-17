@@ -78,7 +78,7 @@ class account_test : public ::testing::Test {
     uint64_t m_init_sequence{0};
     cbdc::privkey_t m_init_account_skey{1};
 
-    std::unique_ptr<secp256k1_context, decltype(&secp256k1_context_destroy)>
+    std::unique_ptr<secp256k1_context, void(*)(secp256k1_context*)>
         m_secp_context{secp256k1_context_create(SECP256K1_CONTEXT_SIGN),
                        &secp256k1_context_destroy};
     cbdc::pubkey_t m_init_account_pkey{
@@ -115,12 +115,12 @@ TEST_F(account_test, pay_test) {
                                    m_init_account_skey.data());
 
     cbdc::signature_t sig{};
-    ret = secp256k1_schnorrsig_sign(m_secp_context.get(),
-                                    sig.data(),
-                                    sighash.data(),
-                                    &keypair,
-                                    nullptr,
-                                    nullptr);
+    static_assert(sighash.size() == 32, "secp256k1_schnorrsig_sign32 expects a 32-byte hash");
+    ret = secp256k1_schnorrsig_sign32(m_secp_context.get(),
+                                      sig.data(),
+                                      sighash.data(),
+                                      &keypair,
+                                      nullptr);
     params.append(sig.data(), sig.size());
 
     auto exp_from_acc_key = cbdc::buffer();

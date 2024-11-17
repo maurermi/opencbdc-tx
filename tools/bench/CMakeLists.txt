@@ -7,6 +7,7 @@ target_link_libraries(twophase-gen sentinel
                                    sentinel_interface
                                    locking_shard
                                    coordinator
+                                   raft
                                    transaction
                                    rpc
                                    network
@@ -14,14 +15,17 @@ target_link_libraries(twophase-gen sentinel
                                    serialization
                                    crypto
                                    ${NURAFT_LIBRARY}
+                                   ${LEVELDB_LIBRARY}
                                    secp256k1
                                    ${CMAKE_THREAD_LIBS_INIT})
 
 add_executable(atomizer-cli-watchtower atomizer-cli-watchtower.cpp)
 target_link_libraries(atomizer-cli-watchtower watchtower
+                                              archiver
                                               atomizer
                                               sentinel
                                               sentinel_interface
+                                              raft
                                               rpc
                                               transaction
                                               network
@@ -30,6 +34,7 @@ target_link_libraries(atomizer-cli-watchtower watchtower
                                               crypto
                                               secp256k1
                                               ${NURAFT_LIBRARY}
+                                              ${LEVELDB_LIBRARY}
                                               ${CMAKE_THREAD_LIBS_INIT})
 
 add_subdirectory(parsec)

@@ -195,14 +195,14 @@ namespace cbdc {
                                                seckey.data());
                 assert(ret == 1);
 
+                static_assert(sighash.size() == 32, "secp256k1_schnorrsig_sign32 expects a 32-byte hash");
                 std::array<unsigned char, sig_len> sig_arr{};
                 [[maybe_unused]] const auto sign_ret
-                    = secp256k1_schnorrsig_sign(m_secp.get(),
-                                                sig_arr.data(),
-                                                sighash.data(),
-                                                &keypair,
-                                                nullptr,
-                                                nullptr);
+                    = secp256k1_schnorrsig_sign32(m_secp.get(),
+                                                  sig_arr.data(),
+                                                  sighash.data(),
+                                                  &keypair,
+                                                  nullptr);
                 std::memcpy(
                     &sig[transaction::validation::p2pk_witness_prog_len],
                     sig_arr.data(),

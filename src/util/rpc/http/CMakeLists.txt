@@ -8,3 +8,5 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_sources(json_rpc_http PRIVATE epoll_event_handler.cpp)
 endif()
+
+target_link_libraries(json_rpc_http PRIVATE ${CURL_LIBRARY})

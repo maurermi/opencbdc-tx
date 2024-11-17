@@ -6,6 +6,7 @@ add_library(archiver client.cpp
 add_executable(archiverd archiverd.cpp)
 target_link_libraries(archiverd archiver
                                 atomizer
+                                raft
                                 watchtower
                                 transaction
                                 network

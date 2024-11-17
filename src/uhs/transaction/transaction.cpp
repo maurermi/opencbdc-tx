@@ -144,13 +144,14 @@ namespace cbdc::transaction {
         assert(ret == 1);
 
         auto sig = signature_t();
+        static_assert(payload.size() == 32, "secp256k1_schnorrsig_sign32 expects a 32-byte hash");
+
         [[maybe_unused]] const auto sign_ret
-            = secp256k1_schnorrsig_sign(ctx,
-                                        sig.data(),
-                                        payload.data(),
-                                        &keypair,
-                                        nullptr,
-                                        nullptr);
+            = secp256k1_schnorrsig_sign32(ctx,
+                                          sig.data(),
+                                          payload.data(),
+                                          &keypair,
+                                          nullptr);
         assert(sign_ret == 1);
         return {pubkey, sig};
     }
@@ -178,6 +179,7 @@ namespace cbdc::transaction {
         if(secp256k1_schnorrsig_verify(ctx,
                                        att.second.data(),
                                        payload.data(),
+                                       payload.size(),
                                        &pubkey)
            != 1) {
             return false;

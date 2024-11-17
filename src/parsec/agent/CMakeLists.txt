@@ -13,6 +13,7 @@ target_link_libraries(agentd broker
                              directory
                              ticket_machine
                              runtime_locking_shard
+                             raft
                              parsec
                              evm_runner
                              lua_runner
@@ -25,6 +26,8 @@ target_link_libraries(agentd broker
                              common
                              crypto
                              secp256k1
+                             ${NURAFT_LIBRARY}
+                             ${LEVELDB_LIBRARY}
                              ${LUA_LIBRARY}
                              ${JSON_LIBRARY}
                              ${MHD_LIBRARY}

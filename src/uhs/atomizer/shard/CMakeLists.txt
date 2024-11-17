@@ -8,6 +8,7 @@ target_link_libraries(shardd shard
                              atomizer
                              archiver
                              watchtower
+                             raft
                              transaction
                              network
                              common

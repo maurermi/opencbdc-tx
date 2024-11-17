@@ -15,6 +15,7 @@ target_link_libraries(atomizer-raftd atomizer_raft
                                      atomizer
                                      raft
                                      watchtower
+                                     archiver
                                      transaction
                                      network
                                      common

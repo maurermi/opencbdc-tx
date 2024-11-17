@@ -16,7 +16,7 @@
 namespace cbdc::transaction::validation {
     static const auto secp_context
         = std::unique_ptr<secp256k1_context,
-                          decltype(&secp256k1_context_destroy)>(
+                          void(*)(secp256k1_context*)>(
             secp256k1_context_create(SECP256K1_CONTEXT_VERIFY),
             &secp256k1_context_destroy);
 
@@ -232,6 +232,7 @@ namespace cbdc::transaction::validation {
         if(secp256k1_schnorrsig_verify(secp_context.get(),
                                        sig_arr.data(),
                                        sighash.data(),
+                                       sighash.size(),
                                        &pubkey)
            != 1) {
             return witness_error_code::invalid_signature;

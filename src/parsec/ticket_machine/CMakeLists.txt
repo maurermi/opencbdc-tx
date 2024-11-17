@@ -16,4 +16,5 @@ target_link_libraries(ticket_machined ticket_machine
                                       crypto
                                       ${NURAFT_LIBRARY}
                                       ${LEVELDB_LIBRARY}
+                                      secp256k1
                                       ${CMAKE_THREAD_LIBS_INIT})

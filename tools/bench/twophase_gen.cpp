@@ -78,7 +78,7 @@ auto main(int argc, char** argv) -> int {
 
         auto compact_mint_tx = cbdc::transaction::compact_tx(mint_tx);
         auto secp = std::unique_ptr<secp256k1_context,
-                                    decltype(&secp256k1_context_destroy)>{
+                                    void(*)(secp256k1_context*)>{
             secp256k1_context_create(SECP256K1_CONTEXT_SIGN),
             &secp256k1_context_destroy};
         for(size_t i = 0; i < cfg.m_attestation_threshold; i++) {
