@@ -149,7 +149,9 @@ namespace cbdc::parsec::agent {
             // transaction as m_param and let the runner figure it out.
             handle_function(broker::value_type(get_function()));
         } else {
-            m_log->trace("do_start ", get_function().to_hex());
+            if (m_log->get_log_level() <= cbdc::logging::log_level::trace) {
+                m_log->trace("do_start ", get_function().to_hex());
+            }
 
             auto tl_success = m_broker->try_lock(
                 m_ticket_number.value(),
@@ -264,12 +266,14 @@ namespace cbdc::parsec::agent {
                                  m_ticket_number.value());
                     auto reacquired = std::make_shared<std::atomic<size_t>>();
                     for(auto& it : *reacq_locks) {
-                        m_log->trace("Re-acquiring lock on",
-                                     it.first.to_hex(),
-                                     "type",
-                                     static_cast<int>(it.second),
-                                     "for",
-                                     m_ticket_number.value());
+                        if (m_log->get_log_level() <= cbdc::logging::log_level::trace) {
+                            m_log->trace("Re-acquiring lock on",
+                                         it.first.to_hex(),
+                                         "type",
+                                         static_cast<int>(it.second),
+                                         "for",
+                                         m_ticket_number.value());
+                        }
                         auto success = do_try_lock_request(
                             it.first,
                             it.second,

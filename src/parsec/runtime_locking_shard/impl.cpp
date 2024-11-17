@@ -22,10 +22,12 @@ namespace cbdc::parsec::runtime_locking_shard {
         auto maybe_error = [&]() -> std::optional<error_code> {
             std::unique_lock<std::mutex> l(m_mut);
 
-            m_log->trace(ticket_number,
-                         "requesting lock on",
-                         key.to_hex(),
-                         static_cast<int>(locktype));
+            if (m_log->get_log_level() <= cbdc::logging::log_level::trace) {
+                m_log->trace(ticket_number,
+                             "requesting lock on",
+                             key.to_hex(),
+                             static_cast<int>(locktype));
+            }
 
             auto it = m_tickets.find(ticket_number);
             if(first_lock && it != m_tickets.end()) {
@@ -323,18 +325,22 @@ namespace cbdc::parsec::runtime_locking_shard {
             auto& lk = locked_element.m_lock;
             // Release the read lock held by the wounded ticket
             if(lt == lock_type::read) {
-                m_log->trace("Releasing read lock on",
-                             lock_key.to_hex(),
-                             "held by",
-                             ticket_number);
+                if (m_log->get_log_level() <= cbdc::logging::log_level::trace) {
+                    m_log->trace("Releasing read lock on",
+                                 lock_key.to_hex(),
+                                 "held by",
+                                 ticket_number);
+                }
                 lk.m_readers.erase(ticket_number);
             }
             // Release the write lock held by the wounded ticket
             if(lt == lock_type::write) {
-                m_log->trace("Releasing write lock on",
-                             lock_key.to_hex(),
-                             "held by",
-                             ticket_number);
+                if (m_log->get_log_level() <= cbdc::logging::log_level::trace) {
+                    m_log->trace("Releasing write lock on",
+                                 lock_key.to_hex(),
+                                 "held by",
+                                 ticket_number);
+                }
                 lk.m_writer.reset();
             }
             keys.insert(lock_key);
@@ -498,10 +504,12 @@ namespace cbdc::parsec::runtime_locking_shard {
             if(lk.m_writer.has_value()) {
                 return false;
             }
-            m_log->trace("Assigning read lock on",
-                         key.to_hex(),
-                         "to",
-                         queued_ticket_number);
+            if (m_log->get_log_level() <= cbdc::logging::log_level::trace) {
+                m_log->trace("Assigning read lock on",
+                             key.to_hex(),
+                             "to",
+                             queued_ticket_number);
+            }
             lk.m_readers.insert(queued_ticket_number);
         }
         // Acquire the write lock if the ticket requested a
@@ -521,10 +529,12 @@ namespace cbdc::parsec::runtime_locking_shard {
                 // Upgrade from a read to a write lock
                 lk.m_readers.clear();
             }
-            m_log->trace("Assigning write lock on",
-                         key.to_hex(),
-                         "to",
-                         queued_ticket_number);
+            if (m_log->get_log_level() <= cbdc::logging::log_level::trace) {
+                m_log->trace("Assigning write lock on",
+                             key.to_hex(),
+                             "to",
+                             queued_ticket_number);
+            }
             lk.m_writer = queued_ticket_number;
             acquire_next = false;
         }

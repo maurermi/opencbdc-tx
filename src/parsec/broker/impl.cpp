@@ -116,13 +116,15 @@ namespace cbdc::parsec::broker {
                                      "wounded ticket",
                                      ticket_number);
                     }
-                    m_log->trace(this,
-                                 "Shard error",
-                                 static_cast<int>(e.m_error_code),
-                                 "locking key",
-                                 key.to_hex(),
-                                 "for",
-                                 ticket_number);
+                    if (m_log->get_log_level() <= cbdc::logging::log_level::trace) {
+                        m_log->trace(this,
+                                     "Shard error",
+                                     static_cast<int>(e.m_error_code),
+                                     "locking key",
+                                     key.to_hex(),
+                                     "for",
+                                     ticket_number);
+                    }
                     return e;
                 }},
             res);
