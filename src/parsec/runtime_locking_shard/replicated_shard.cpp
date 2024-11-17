@@ -11,7 +11,7 @@ namespace cbdc::parsec::runtime_locking_shard {
                                    state_type state_update,
                                    callback_type result_callback) -> bool {
         auto ret = [&]() {
-            std::unique_lock l(m_mut);
+            std::lock_guard l(m_mut);
             m_tickets.emplace(ticket_number,
                               ticket_type{broker_id,
                                           std::move(state_update),
@@ -25,7 +25,7 @@ namespace cbdc::parsec::runtime_locking_shard {
     auto replicated_shard::commit(ticket_number_type ticket_number,
                                   callback_type result_callback) -> bool {
         auto ret = [&]() -> return_type {
-            std::unique_lock l(m_mut);
+            std::lock_guard l(m_mut);
             auto it = m_tickets.find(ticket_number);
             if(it == m_tickets.end()) {
                 return error_code::unknown_ticket;
@@ -44,7 +44,7 @@ namespace cbdc::parsec::runtime_locking_shard {
     auto replicated_shard::finish(ticket_number_type ticket_number,
                                   callback_type result_callback) -> bool {
         auto ret = [&]() -> return_type {
-            std::unique_lock l(m_mut);
+            std::lock_guard l(m_mut);
             m_tickets.erase(ticket_number);
             return std::nullopt;
         }();
@@ -55,7 +55,7 @@ namespace cbdc::parsec::runtime_locking_shard {
     auto replicated_shard::get_tickets(
         get_tickets_callback_type result_callback) const -> bool {
         auto ret = [&]() -> get_tickets_return_type {
-            std::unique_lock l(m_mut);
+            std::lock_guard l(m_mut);
             return m_tickets;
         }();
         result_callback(std::move(ret));
@@ -63,7 +63,7 @@ namespace cbdc::parsec::runtime_locking_shard {
     }
 
     auto replicated_shard::get_state() const -> state_type {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         return m_state;
     }
 }

@@ -98,7 +98,7 @@ namespace cbdc::network {
         };
 
         {
-            std::unique_lock<std::shared_mutex> l(m_peer_mutex);
+            std::lock_guard<std::shared_mutex> l(m_peer_mutex);
             auto p = std::make_unique<peer>(std::move(sock),
                                             recv_cb,
                                             attempt_reconnect);
@@ -192,7 +192,7 @@ namespace cbdc::network {
             }
         }
         {
-            std::unique_lock<std::shared_mutex> l(m_peer_mutex);
+            std::lock_guard<std::shared_mutex> l(m_peer_mutex);
             m_peers.clear();
         }
         m_async_recv_cv.notify_all();

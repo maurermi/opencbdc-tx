@@ -72,7 +72,7 @@ namespace cbdc::parsec::agent::rpc {
                 m_secp,
                 m_threads);
             {
-                std::unique_lock l(m_agents_mut);
+                std::lock_guard l(m_agents_mut);
                 m_agents.emplace(id, agent);
             }
             return agent;

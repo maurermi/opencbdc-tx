@@ -43,7 +43,7 @@ namespace cbdc::rpc {
                 m_handler_thread.join();
             }
             {
-                std::unique_lock<std::mutex> l(m_responses_mut);
+                std::lock_guard<std::mutex> l(m_responses_mut);
                 for(auto& [request_id, action] : m_responses) {
                     set_response_value(action, std::nullopt);
                 }
@@ -105,7 +105,7 @@ namespace cbdc::rpc {
                           request_id_type request_id,
                           response_action_type response_action) -> bool {
             {
-                std::unique_lock<std::mutex> l(m_responses_mut);
+                std::lock_guard<std::mutex> l(m_responses_mut);
                 assert(m_responses.find(request_id) == m_responses.end());
                 m_responses[request_id] = std::move(response_action);
             }
@@ -163,7 +163,7 @@ namespace cbdc::rpc {
         void set_response(request_id_type request_id,
                           std::optional<response_type> value) {
             auto response_node = [&]() {
-                std::unique_lock<std::mutex> l(m_responses_mut);
+                std::lock_guard<std::mutex> l(m_responses_mut);
                 return m_responses.extract(request_id);
             }();
 
@@ -179,7 +179,7 @@ namespace cbdc::rpc {
                              request_id,
                              std::move(response_callback))) {
                 {
-                    std::unique_lock<std::mutex> l(m_responses_mut);
+                    std::lock_guard<std::mutex> l(m_responses_mut);
                     m_responses.erase(request_id);
                 }
                 return false;

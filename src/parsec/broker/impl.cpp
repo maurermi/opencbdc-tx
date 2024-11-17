@@ -48,7 +48,7 @@ namespace cbdc::parsec::broker {
         std::visit(overloaded{[&](const parsec::ticket_machine::interface::
                                       ticket_number_range_type& n) {
                                   {
-                                      std::unique_lock l(m_mut);
+                                      std::lock_guard l(m_mut);
                                       if(m_highest_ticket < n.second) {
                                           m_highest_ticket = n.second;
                                       }
@@ -82,7 +82,7 @@ namespace cbdc::parsec::broker {
             overloaded{
                 [&](parsec::runtime_locking_shard::value_type v)
                     -> try_lock_return_type {
-                    std::unique_lock l(m_mut);
+                    std::lock_guard l(m_mut);
                     auto it = m_tickets.find(ticket_number);
                     if(it == m_tickets.end()) {
                         return error_code::unknown_ticket;
@@ -136,7 +136,7 @@ namespace cbdc::parsec::broker {
                         lock_type locktype,
                         try_lock_callback_type result_callback) -> bool {
         auto maybe_error = [&]() -> std::optional<error_code> {
-            std::unique_lock l(m_mut);
+            std::lock_guard l(m_mut);
             auto it = m_tickets.find(ticket_number);
             if(it == m_tickets.end()) {
                 return error_code::unknown_ticket;
@@ -187,7 +187,7 @@ namespace cbdc::parsec::broker {
         uint64_t shard_idx,
         parsec::runtime_locking_shard::interface::prepare_return_type res) {
         auto maybe_error = [&]() -> std::optional<commit_return_type> {
-            std::unique_lock ll(m_mut);
+            std::lock_guard ll(m_mut);
             auto itt = m_tickets.find(ticket_number);
             if(itt == m_tickets.end()) {
                 return error_code::unknown_ticket;
@@ -315,7 +315,7 @@ namespace cbdc::parsec::broker {
         parsec::runtime_locking_shard::interface::commit_return_type res) {
         auto callback = false;
         auto maybe_error = [&]() -> std::optional<error_code> {
-            std::unique_lock lll(m_mut);
+            std::lock_guard lll(m_mut);
             auto ittt = m_tickets.find(ticket_number);
             if(ittt == m_tickets.end()) {
                 return error_code::unknown_ticket;
@@ -380,7 +380,7 @@ namespace cbdc::parsec::broker {
                       commit_callback_type result_callback) -> bool {
         m_log->trace(this, "Broker got commit request for", ticket_number);
         auto maybe_error = [&]() -> std::optional<error_code> {
-            std::unique_lock l(m_mut);
+            std::lock_guard l(m_mut);
             auto it = m_tickets.find(ticket_number);
             if(it == m_tickets.end()) {
                 return error_code::unknown_ticket;
@@ -495,7 +495,7 @@ namespace cbdc::parsec::broker {
                       finish_callback_type result_callback) -> bool {
         auto done = false;
         auto maybe_error = [&]() -> std::optional<error_code> {
-            std::unique_lock l(m_mut);
+            std::lock_guard l(m_mut);
             auto it = m_tickets.find(ticket_number);
             if(it == m_tickets.end()) {
                 m_log->trace(this,
@@ -575,7 +575,7 @@ namespace cbdc::parsec::broker {
         m_log->trace(this, "Broker got rollback request for", ticket_number);
         auto callback = false;
         auto maybe_error = [&]() -> std::optional<error_code> {
-            std::unique_lock l(m_mut);
+            std::lock_guard l(m_mut);
             auto it = m_tickets.find(ticket_number);
             if(it == m_tickets.end()) {
                 return error_code::unknown_ticket;
@@ -658,7 +658,7 @@ namespace cbdc::parsec::broker {
         parsec::runtime_locking_shard::interface::rollback_return_type res) {
         auto callback = false;
         auto maybe_error = [&]() -> std::optional<error_code> {
-            std::unique_lock lll(m_mut);
+            std::lock_guard lll(m_mut);
             auto ittt = m_tickets.find(ticket_number);
             if(ittt == m_tickets.end()) {
                 return error_code::unknown_ticket;
@@ -738,7 +738,7 @@ namespace cbdc::parsec::broker {
         std::optional<parsec::directory::interface::key_location_return_type>
             res) {
         auto maybe_error = [&]() -> std::optional<try_lock_return_type> {
-            std::unique_lock l(m_mut);
+            std::lock_guard l(m_mut);
             assert(res < m_shards.size());
             auto ticket = m_tickets.find(ticket_number);
             if(ticket == m_tickets.end()) {
@@ -810,7 +810,7 @@ namespace cbdc::parsec::broker {
         parsec::runtime_locking_shard::interface::finish_return_type res) {
         auto callback = false;
         auto maybe_error = [&]() -> std::optional<error_code> {
-            std::unique_lock lll(m_mut);
+            std::lock_guard lll(m_mut);
             auto ittt = m_tickets.find(ticket_number);
             if(ittt == m_tickets.end()) {
                 return error_code::unknown_ticket;
@@ -884,7 +884,7 @@ namespace cbdc::parsec::broker {
     auto impl::recover(recover_callback_type result_callback) -> bool {
         // Do not allow recovery when tickets are in-flight
         auto maybe_tickets = [&]() {
-            std::unique_lock l(m_mut);
+            std::lock_guard l(m_mut);
             return !m_tickets.empty();
         }();
         if(maybe_tickets) {
@@ -916,7 +916,7 @@ namespace cbdc::parsec::broker {
             overloaded{[&](const runtime_locking_shard::interface::
                                get_tickets_success_type& tickets)
                            -> std::optional<error_code> {
-                           std::unique_lock l(m_mut);
+                           std::lock_guard l(m_mut);
                            m_recovery_tickets.emplace(shard_idx, tickets);
                            if(m_recovery_tickets.size() != m_shards.size()) {
                                return std::nullopt;
@@ -1058,7 +1058,7 @@ namespace cbdc::parsec::broker {
             return;
         }
         auto done = [&]() {
-            std::unique_lock l(m_mut);
+            std::lock_guard l(m_mut);
             return m_tickets.empty();
         }();
         if(done) {

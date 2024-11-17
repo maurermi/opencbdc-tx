@@ -7,7 +7,7 @@
 
 namespace cbdc {
     thread_pool::~thread_pool() {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         for(auto& t : m_threads) {
             t->m_queue.clear();
             if(t->m_thread.joinable()) {
@@ -17,7 +17,7 @@ namespace cbdc {
     }
 
     void thread_pool::push(const std::function<void()>& fn) {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         auto launched = false;
         for(auto& thr : m_threads) {
             if(thr->m_running) {

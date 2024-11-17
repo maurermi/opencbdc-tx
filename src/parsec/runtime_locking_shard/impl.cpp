@@ -20,7 +20,7 @@ namespace cbdc::parsec::runtime_locking_shard {
         auto callbacks = pending_callbacks_list_type();
         auto w_details = std::optional<wounded_details>();
         auto maybe_error = [&]() -> std::optional<error_code> {
-            std::unique_lock<std::mutex> l(m_mut);
+            std::lock_guard<std::mutex> l(m_mut);
 
             if (m_log->get_log_level() <= cbdc::logging::log_level::trace) {
                 m_log->trace(ticket_number,
@@ -184,7 +184,7 @@ namespace cbdc::parsec::runtime_locking_shard {
                        state_update_type state_update,
                        prepare_callback_type result_callback) -> bool {
         auto result = [&]() -> std::optional<shard_error> {
-            std::unique_lock<std::mutex> l(m_mut);
+            std::lock_guard<std::mutex> l(m_mut);
             // Grab the ticket and ensure it exists
             auto ticket_it = m_tickets.find(ticket_number);
             if(ticket_it == m_tickets.end()) {
@@ -250,7 +250,7 @@ namespace cbdc::parsec::runtime_locking_shard {
                       commit_callback_type result_callback) -> bool {
         auto callbacks = pending_callbacks_list_type();
         auto result = [&]() -> std::optional<shard_error> {
-            std::unique_lock<std::mutex> l(m_mut);
+            std::lock_guard<std::mutex> l(m_mut);
             // Grab the ticket and ensure it exists
             auto ticket_it = m_tickets.find(ticket_number);
             if(ticket_it == m_tickets.end()) {
@@ -364,7 +364,7 @@ namespace cbdc::parsec::runtime_locking_shard {
                         rollback_callback_type result_callback) -> bool {
         auto callbacks = pending_callbacks_list_type();
         auto result = [&]() -> std::optional<shard_error> {
-            std::unique_lock<std::mutex> l(m_mut);
+            std::lock_guard<std::mutex> l(m_mut);
             // Grab the ticket and ensure it exists
             auto ticket_it = m_tickets.find(ticket_number);
             if(ticket_it == m_tickets.end()) {
@@ -404,7 +404,7 @@ namespace cbdc::parsec::runtime_locking_shard {
     auto impl::finish(ticket_number_type ticket_number,
                       finish_callback_type result_callback) -> bool {
         auto maybe_error = [&]() -> std::optional<shard_error> {
-            std::unique_lock l(m_mut);
+            std::lock_guard l(m_mut);
             auto ticket_it = m_tickets.find(ticket_number);
             if(ticket_it == m_tickets.end()) {
                 m_log->error(this,
@@ -437,7 +437,7 @@ namespace cbdc::parsec::runtime_locking_shard {
     auto impl::get_tickets(broker_id_type broker_id,
                            get_tickets_callback_type result_callback) -> bool {
         auto result = [&]() -> get_tickets_success_type {
-            std::unique_lock l(m_mut);
+            std::lock_guard l(m_mut);
             auto ret = get_tickets_success_type();
             for(auto& [ticket_number, ticket] : m_tickets) {
                 if(ticket.m_broker_id == broker_id) {
@@ -454,7 +454,7 @@ namespace cbdc::parsec::runtime_locking_shard {
 
     auto impl::recover(const replicated_shard::state_type& state,
                        const replicated_shard::tickets_type& tickets) -> bool {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         if(!m_tickets.empty() && !m_state.empty()) {
             m_log->error("Shard state is not empty, cannot recover");
             return false;

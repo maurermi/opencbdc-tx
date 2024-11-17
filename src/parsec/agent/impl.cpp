@@ -36,7 +36,7 @@ namespace cbdc::parsec::agent {
           m_threads(std::move(t_pool)) {}
 
     auto impl::exec() -> bool {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         switch(m_state) {
             // In these states we can start again from the beginning
             case state::init:
@@ -109,7 +109,7 @@ namespace cbdc::parsec::agent {
     }
 
     void impl::handle_begin(broker::interface::ticketnum_or_errcode_type res) {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         if(m_state != state::begin_sent) {
             m_log->warn("handle_begin while not in begin_sent state");
             return;
@@ -130,7 +130,7 @@ namespace cbdc::parsec::agent {
     }
 
     void impl::do_start() {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         assert(m_ticket_number.has_value());
         assert(m_state == state::begin_sent
                || m_state == state::rollback_complete);
@@ -174,7 +174,7 @@ namespace cbdc::parsec::agent {
     void impl::handle_try_lock_response(
         const broker::interface::try_lock_callback_type& res_cb,
         broker::interface::try_lock_return_type res) {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         if(m_state != state::function_started) {
             m_log->error("try_lock response while not in "
                          "function_started state");
@@ -196,7 +196,7 @@ namespace cbdc::parsec::agent {
                               broker::interface::try_lock_callback_type res_cb)
         -> bool {
         // TODO: permissions for keys
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         assert(m_ticket_number.has_value());
         if(m_state != state::function_started) {
             m_log->warn("do_try_lock_request while not in "
@@ -241,7 +241,7 @@ namespace cbdc::parsec::agent {
 
     void
     impl::handle_function(const broker::interface::try_lock_return_type& res) {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         if(m_state != state::function_get_sent) {
             m_log->warn(
                 "handle_function while not in function_get_sent state");
@@ -280,7 +280,7 @@ namespace cbdc::parsec::agent {
                             [this, reacquired, v, reacq_locks](
                                 const broker::interface::
                                     try_lock_return_type&) {
-                                std::unique_lock ll(m_mut);
+                                std::lock_guard ll(m_mut);
                                 auto reacq = (*reacquired)++;
                                 m_log->trace("Re-acquired",
                                              reacq + 1,
@@ -356,7 +356,7 @@ namespace cbdc::parsec::agent {
     }
 
     void impl::do_commit() {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         assert(m_state == state::function_started
                || m_state == state::commit_failed
                || m_state == state::commit_sent);
@@ -387,7 +387,7 @@ namespace cbdc::parsec::agent {
     }
 
     void impl::handle_run(const runner::interface::run_return_type& res) {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         if(m_state != state::function_started) {
             m_log->warn("handle_run while not in function_started state");
             return;
@@ -427,7 +427,7 @@ namespace cbdc::parsec::agent {
     }
 
     void impl::handle_commit(broker::interface::commit_return_type res) {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         if(m_state != state::commit_sent) {
             m_log->warn(
                 this,
@@ -482,7 +482,7 @@ namespace cbdc::parsec::agent {
     }
 
     void impl::do_result() {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         assert(m_result.has_value());
         switch(m_state) {
             // No results should be reported in these states, fatal bugs
@@ -554,7 +554,7 @@ namespace cbdc::parsec::agent {
     }
 
     void impl::do_finish() {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         assert(m_state == state::commit_sent || m_state == state::finish_failed
                || m_state == state::finish_sent
                || m_state == state::rollback_complete);
@@ -578,7 +578,7 @@ namespace cbdc::parsec::agent {
 
     void
     impl::handle_finish(broker::interface::finish_return_type finish_res) {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         if(m_state != state::finish_sent) {
             m_log->warn("handle_finish while not in finish_sent state");
             return;
@@ -599,7 +599,7 @@ namespace cbdc::parsec::agent {
     }
 
     void impl::do_rollback(bool finish) {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         assert(m_state == state::commit_failed
                || m_state == state::rollback_sent
                || m_state == state::function_exception
@@ -628,7 +628,7 @@ namespace cbdc::parsec::agent {
 
     void impl::handle_rollback(
         broker::interface::rollback_return_type rollback_res) {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         if(m_state != state::rollback_sent) {
             m_log->warn("handle_rollback while not in rollback_sent state");
             return;
@@ -659,7 +659,7 @@ namespace cbdc::parsec::agent {
     }
 
     impl::~impl() {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         if(m_state != state::finish_complete) {
             m_log->fatal(
                 this,
@@ -670,12 +670,12 @@ namespace cbdc::parsec::agent {
 
     auto impl::get_ticket_number() const
         -> std::optional<ticket_machine::ticket_number_type> {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         return m_ticket_number;
     }
 
     auto impl::get_state() const -> state {
-        std::unique_lock l(m_mut);
+        std::lock_guard l(m_mut);
         return m_state;
     }
 }

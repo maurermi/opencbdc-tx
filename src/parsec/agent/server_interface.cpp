@@ -18,7 +18,7 @@ namespace cbdc::parsec::agent::rpc {
         m_cleanup_thread = std::thread([&]() {
             size_t id{};
             while(m_cleanup_queue.pop(id)) {
-                std::unique_lock l(m_agents_mut);
+                std::lock_guard l(m_agents_mut);
                 m_agents.erase(id);
             }
         });
@@ -26,7 +26,7 @@ namespace cbdc::parsec::agent::rpc {
             size_t id{};
             while(m_retry_queue.pop(id)) {
                 auto a = [&]() {
-                    std::unique_lock l(m_agents_mut);
+                    std::lock_guard l(m_agents_mut);
                     auto it = m_agents.find(id);
                     assert(it != m_agents.end());
                     return it->second;
@@ -46,7 +46,7 @@ namespace cbdc::parsec::agent::rpc {
         m_cleanup_thread.join();
         m_log->trace("Stopped runner cleanup thread");
         {
-            std::unique_lock l(m_agents_mut);
+            std::lock_guard l(m_agents_mut);
             m_agents.clear();
         }
         m_log->trace("Cleaned up all runners");

@@ -99,7 +99,7 @@ namespace cbdc::rpc {
                                                             "Origin");
             *con_cls = new_req.get();
             {
-                std::unique_lock l(server->m_requests_mut);
+                std::lock_guard l(server->m_requests_mut);
                 server->m_requests.emplace(new_req.get(), std::move(new_req));
             }
             // server->m_requests_started++;
@@ -291,7 +291,7 @@ namespace cbdc::rpc {
         auto* req = static_cast<request*>(*con_cls);
         auto* server = static_cast<json_rpc_http_server*>(cls);
         {
-            std::unique_lock l(server->m_requests_mut);
+            std::lock_guard l(server->m_requests_mut);
             server->m_requests.erase(req);
             // std::cout << "waiting on requests " << server->m_requests.size()
             // << " " << server->m_requests_started << std::endl;

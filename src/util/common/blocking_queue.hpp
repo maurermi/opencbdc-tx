@@ -40,7 +40,7 @@ namespace cbdc {
         /// \param item object to push onto the queue.
         auto push(const T& item) -> size_t {
             auto sz = [&]() {
-                std::unique_lock<std::mutex> lck(m_mut);
+                std::lock_guard<std::mutex> lck(m_mut);
                 m_buffer.push(item);
                 m_wake = true;
                 return m_buffer.size();
@@ -80,7 +80,7 @@ namespace cbdc {
         /// Clears the queue and unblocks waiting consumers.
         void clear() {
             {
-                std::unique_lock<std::mutex> lck(m_mut);
+                std::lock_guard<std::mutex> lck(m_mut);
                 m_buffer = decltype(m_buffer)();
                 m_wake = true;
             }
@@ -91,7 +91,7 @@ namespace cbdc {
         /// \ref clear() before re-using the queue. All consumers must have
         /// returned from \ref pop() before calling this method.
         void reset() {
-            std::unique_lock l(m_mut);
+            std::lock_guard<std::mutex> l(m_mut);
             m_wake = false;
         }
 

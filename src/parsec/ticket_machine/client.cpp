@@ -21,7 +21,7 @@ namespace cbdc::parsec::ticket_machine::rpc {
         -> bool {
         auto num = ticket_number_type{};
         {
-            std::unique_lock l(m_mut);
+            std::lock_guard l(m_mut);
             constexpr auto fetch_threshold = 500;
             if(m_tickets.size() < fetch_threshold && !m_fetching_tickets) {
                 auto res = fetch_tickets();
@@ -57,7 +57,7 @@ namespace cbdc::parsec::ticket_machine::rpc {
                                           auto callbacks
                                               = decltype(m_callbacks)();
                                           {
-                                              std::unique_lock ll(m_mut);
+                                              std::lock_guard ll(m_mut);
                                               m_fetching_tickets = false;
                                               callbacks.swap(m_callbacks);
                                           }
@@ -74,7 +74,7 @@ namespace cbdc::parsec::ticket_machine::rpc {
         auto callbacks = decltype(m_callbacks)();
         auto tickets = decltype(m_tickets)();
         {
-            std::unique_lock ll(m_mut);
+            std::lock_guard ll(m_mut);
             for(ticket_number_type i = range.first; i < range.second; i++) {
                 m_tickets.push(i);
             }

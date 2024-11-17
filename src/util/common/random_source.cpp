@@ -24,7 +24,7 @@ namespace cbdc {
     }
 
     auto random_source::operator()() -> result_type {
-        std::unique_lock<std::mutex> l(m_mut);
+        std::lock_guard<std::mutex> l(m_mut);
         result_type ret{};
         std::array<unsigned char, sizeof(ret)> ret_arr{};
         for(auto& v : ret_arr) {

@@ -36,7 +36,7 @@ namespace cbdc {
         /// \return true if the value was not already in the set.
         template<typename T>
         auto add(T&& val) -> bool {
-            std::unique_lock<std::shared_mutex> l(m_mut);
+            std::lock_guard<std::shared_mutex> l(m_mut);
             auto added = m_vals.emplace(std::forward<T>(val));
             if(added.second) {
                 m_eviction_queue.push(std::ref(*added.first));
