@@ -62,7 +62,7 @@ namespace cbdc::network {
 
             for(auto&& q : m_async_recv_queues) {
                 if(!q.empty()) {
-                    pkts.push_back(std::move(q.front()));
+                    pkts.emplace_back(std::move(q.front()));
                     q.pop();
 
                     // The queue still has packets so don't block

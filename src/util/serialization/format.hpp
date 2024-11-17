@@ -217,13 +217,13 @@ namespace cbdc {
                     if(!(packet >> val)) {
                         return packet;
                     }
-                    vec.push_back(std::move(val));
+                    vec.emplace_back(std::move(val));
                 } else {
                     auto val = T(packet);
                     if(!packet) {
                         return packet;
                     }
-                    vec.push_back(std::move(val));
+                    vec.emplace_back(std::move(val));
                 }
             }
         }

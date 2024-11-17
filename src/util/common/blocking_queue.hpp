@@ -99,7 +99,7 @@ namespace cbdc {
         template<typename TT, typename QQ>
         auto first_item() ->
             typename std::enable_if<std::is_same<QQ, std::queue<TT>>::value,
-                                    const TT&>::type {
+                                    TT&>::type {
             return m_buffer.front();
         }
 
