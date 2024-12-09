@@ -79,7 +79,11 @@ namespace cbdc::parsec::broker {
             get_tickets_error,
             /// A commit is attempted without associating update keys with
             /// ticket
-            commit_hazard
+            commit_hazard,
+            /// The directory returned an invalid shard ID
+            invalid_shard_id,
+            /// Could not lock all keys
+            lock_batch_incomplete,
         };
 
         /// Return type from a begin operation. Either a new ticket number or
@@ -118,6 +122,30 @@ namespace cbdc::parsec::broker {
                  key_type key,
                  lock_type locktype,
                  try_lock_callback_type result_callback) -> bool
+            = 0;
+
+        /// Return type from a try lock operation. Either the value associated
+        /// with the requested key, a broker error, or a shard error.
+        using try_lock_batch_return_type
+            = std::variant<std::vector<value_type>,
+                           error_code,
+                           runtime_locking_shard::shard_error>;
+                           
+        /// Callback function type for a try lock operation.
+        using try_lock_batch_callback_type
+            = std::function<void(try_lock_batch_return_type)>;
+
+        /// Attempts to acquire the given lock on the appropriate shard.
+        /// \param ticket_number ticket number.
+        /// \param key key to lock.
+        /// \param locktype type of lock to acquire.
+        /// \param result_callback function to call with try lock result.
+        /// \return true if the operation was initiated successfully.
+        [[nodiscard]] virtual auto
+        try_lock_batch(ticket_number_type ticket_number,
+                       std::vector<key_type> keys,
+                       std::vector<lock_type> locktypes,
+                       try_lock_batch_callback_type result_callback) -> bool
             = 0;
 
         /// Return type from a commit operation. Broker or shard error code, if

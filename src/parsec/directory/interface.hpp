@@ -34,6 +34,25 @@ namespace cbdc::parsec::directory {
                                   key_location_callback_type result_callback)
             -> bool
             = 0;
+
+        /// Return type from a key location batch operation.
+        using key_location_batch_return_type
+            = std::unordered_map<key_location_return_type,
+                                 std::vector<runtime_locking_shard::key_type>>;
+
+        /// Callback function type for key location result.
+        using key_location_batch_callback_type
+            = std::function<void(key_location_batch_return_type)>;
+
+        /// Returns the shard IDs responsible for the given keys.
+        /// \param keys keys to locate.
+        /// \param result_callback function to call with key locations.
+        /// \return true if the operation was initiated successfully.
+        virtual auto
+        key_location_batch(std::vector<runtime_locking_shard::key_type> keys,
+                           key_location_batch_callback_type result_callback)
+            -> bool
+            = 0;
     };
 }
 

@@ -25,6 +25,14 @@ namespace cbdc::parsec::directory {
                           key_location_callback_type result_callback)
             -> bool override;
 
+        /// Returns the shard IDs responsible for the given keys.
+        /// \param keys keys to locate.
+        /// \param result_callback function to call with key locations.
+        /// \return true.
+        auto key_location_batch(
+            std::vector<runtime_locking_shard::key_type> keys,
+            key_location_batch_callback_type result_callback) -> bool override;
+
       private:
         size_t m_n_shards{};
         hashing::const_sip_hash<runtime_locking_shard::key_type> m_siphash{};

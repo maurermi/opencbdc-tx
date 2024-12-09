@@ -116,6 +116,126 @@ namespace cbdc::parsec::runtime_locking_shard {
         return true;
     }
 
+    auto
+    impl::try_lock_batch(ticket_number_type ticket_number,
+                         broker_id_type broker_id,
+                         std::unordered_map<key_type, lock_type> key_locktypes,
+                         bool first_lock,
+                         try_lock_batch_callback_type result_callback)
+        -> bool {
+        for(const auto& [key, locktype] : key_locktypes) {
+            auto callbacks = pending_callbacks_list_type();
+            auto w_details = std::optional<wounded_details>();
+            auto maybe_error = [&]() -> std::optional<error_code> {
+                std::unique_lock<std::mutex> l(m_mut);
+
+                m_log->trace(ticket_number,
+                             "requesting lock on",
+                             key.to_hex(),
+                             static_cast<int>(locktype));
+
+                auto it = m_tickets.find(ticket_number);
+                if(first_lock && it != m_tickets.end()) {
+                    m_log->fatal(ticket_number,
+                                 "called try_lock with first lock but ticket "
+                                 "already exists");
+                }
+                if(it == m_tickets.end()) {
+                    if(!first_lock) {
+                        m_log->error(ticket_number,
+                                     "called try_lock with unknown ticket");
+                        return error_code::unknown_ticket;
+                    }
+                    it = m_tickets.emplace(ticket_number, ticket_state_type{})
+                             .first;
+                }
+                auto& ticket = it->second;
+
+                // Callers shouldn't be using try_lock after prepare
+                if(ticket.m_state == ticket_state::prepared) {
+                    m_log->error(ticket_number,
+                                 "called try_lock after prepare");
+                    return error_code::prepared;
+                }
+
+                if(ticket.m_state == ticket_state::committed) {
+                    m_log->error(ticket_number,
+                                 "called try_lock after commit");
+                    return error_code::committed;
+                }
+
+                // If the ticket way wounded don't bother trying to acquire any
+                // locks
+                if(ticket.m_state == ticket_state::wounded) {
+                    m_log->trace(ticket_number,
+                                 "called try_lock after being wounded");
+                    w_details = ticket.m_wounded_details;
+                    return error_code::wounded;
+                }
+
+                // Make sure the ticket doesn't already hold a lock on the key
+                if(auto lock_it = ticket.m_locks_held.find(key);
+                   lock_it != ticket.m_locks_held.end()
+                   && lock_it->second >= locktype) {
+                    m_log->warn(this,
+                                ticket_number,
+                                "tried to acquire already held lock");
+                    return error_code::lock_held;
+                }
+
+                if(ticket.m_queued_locks.find(key)
+                   != ticket.m_queued_locks.end()) {
+                    m_log->warn(ticket_number,
+                                "tried to acquire already queued lock");
+                    return error_code::lock_queued;
+                }
+
+                ticket.m_broker_id = broker_id;
+
+                // Grab the requested state element
+                auto& state_element = m_state[key];
+                auto& lock = state_element.m_lock;
+
+                // Queue the lock
+                lock.m_queue.emplace(
+                    ticket_number,
+                    lock_queue_element_type{locktype,
+                                            [=](try_lock_return_type result) {
+                                                std::unique_lock l(m_data_batches_mut);
+                                                m_data_batches[ticket_number].m_values[key] = std::move(result);
+                                                if (m_data_batches[ticket_number].m_values.size() == m_data_batches[ticket_number].m_capacity) {
+                                                    result_callback(std::move(m_data_batches[ticket_number].m_values));
+                                                    m_data_batches.erase(ticket_number);
+                                                }
+                                            }});
+                ticket.m_queued_locks.insert(key);
+
+                // Determine if the ticket will wait on any locks
+                auto waiting_on
+                    = get_waiting_on(ticket_number, locktype, lock);
+                callbacks
+                    = wound_tickets(std::move(key), waiting_on, ticket_number);
+
+                w_details = ticket.m_wounded_details;
+
+                m_log->trace(this,
+                             "shard handled part of try_lock_batch for",
+                             ticket_number);
+                return std::nullopt;
+            }();
+
+            if(maybe_error.has_value()) {
+                result_callback(shard_error{maybe_error.value(), w_details});
+            } else {
+                // Call all the result callbacks without holding the lock
+                for(auto& callback : callbacks) {
+                    callback.m_callback(std::move(callback.m_returning));
+                }
+            }
+        }
+        return true;
+    }
+
     auto impl::wound_tickets(
         key_type key,
         const std::vector<ticket_number_type>& blocking_tickets,

@@ -50,6 +50,21 @@ namespace cbdc::parsec::broker {
                       lock_type locktype,
                       try_lock_callback_type result_callback) -> bool override;
 
+        /// Determines the shards responsible for the given keys and issues a
+        /// try lock request for the keys on each shard.
+        /// \param ticket_number ticket number.
+        /// \param keys keys to lock.
+        /// \param locktypes types of locks to acquire.
+        /// \param result_callback function to call with try_lock request.
+        /// \return true: if request to the directory was initiated
+        ///         successfully.
+        ///         false: only if an unexpected exception was encountered
+        auto try_lock_batch(ticket_number_type ticket_number,
+                            std::vector<key_type> keys,
+                            std::vector<lock_type> locktypes,
+                            try_lock_batch_callback_type result_callback)
+            -> bool override;
+
         /// Commits the ticket on all shards involved in the ticket.
         /// \param ticket_number ticket number.
         /// \param state_updates state updates to apply if ticket commits.
@@ -172,6 +187,14 @@ namespace cbdc::parsec::broker {
                          const parsec::runtime_locking_shard::interface::
                              try_lock_return_type& res);
 
+        void
+        handle_lock_batch(ticket_number_type ticket_number,
+                          std::vector<key_type> keys,
+                          uint64_t shard_idx,
+                          const try_lock_batch_callback_type& result_callback,
+                          const parsec::runtime_locking_shard::interface::
+                              try_lock_batch_return_type& res);
+
         void handle_ticket_number(
             begin_callback_type result_callback,
             std::optional<parsec::ticket_machine::interface::
@@ -191,6 +214,15 @@ namespace cbdc::parsec::broker {
             try_lock_callback_type result_callback,
             std::optional<
                 parsec::directory::interface::key_location_return_type> res);
+
+        // Find the location of multiple keys
+        void handle_find_key_batch(
+            ticket_number_type ticket_number,
+            std::unordered_map<key_type, lock_type> key_locktypes,
+            try_lock_batch_callback_type result_callback,
+            std::optional<
+                parsec::directory::interface::key_location_batch_return_type>
+                res);
 
         void handle_finish(
             const finish_callback_type& result_callback,

@@ -45,6 +45,20 @@ namespace cbdc::parsec::runtime_locking_shard::rpc {
                       bool first_lock,
                       try_lock_callback_type result_callback) -> bool override;
 
+        /// Requests a try lock batch operation from the remote shard.
+        /// \param ticket_number ticket number.
+        /// \param broker_id ID of broker managing ticket.
+        /// \param keys keys to lock.
+        /// \param locktypes types of locks to acquire.
+        /// \param first_lock true if this is the first lock.
+        /// \param result_callback function to call with try lock result.
+        /// \return true if the request was sent successfully.
+        auto try_lock_batch(ticket_number_type ticket_number,
+                            broker_id_type broker_id,
+                            std::unordered_map<key_type, lock_type> key_locktypes,
+                            bool first_lock,
+                            try_lock_batch_callback_type result_callback) -> bool override;
+
         /// Requests a prepare operation from the remote shard.
         /// \param ticket_number ticket number.
         /// \param broker_id ID of broker managing ticket.

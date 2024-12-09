@@ -129,6 +129,78 @@ namespace cbdc::parsec::broker {
         result_callback(result);
     }
 
+    void impl::handle_lock_batch(
+        ticket_number_type ticket_number,
+        std::vector<key_type> keys,
+        uint64_t shard_idx,
+        const try_lock_batch_callback_type& result_callback,
+        const parsec::runtime_locking_shard::interface::
+            try_lock_batch_return_type& res) {
+        auto result = std::visit(
+            overloaded{
+                [&](std::unordered_map<key_type, try_lock_return_type> mp)
+                    -> try_lock_batch_return_type {
+                    if(mp.size() != keys.size()) {
+                        m_log->error("Mismatch in number of keys and reported values");
+                        return error_code::lock_batch_incomplete;
+                    }
+                    for(size_t i = 0; i < keys.size(); i++) {
+                        auto key = keys[i];
+                        auto value = mp[key];
+                        // Need to do the visitor pattern here to see if mp[key] 
+                        // is a value_type or a shard_error
+                        std::unique_lock l(m_mut);
+                        auto it = m_tickets.find(ticket_number);
+                        if(it == m_tickets.end()) {
+                            return error_code::unknown_ticket;
+                        }
+
+                        auto t_state = it->second;
+                        auto& s_state = t_state->m_shard_states[shard_idx];
+                        auto k_it = s_state.m_key_states.find(key);
+                        if(k_it == s_state.m_key_states.end()) {
+                            m_log->error("Shard state not found for key");
+                            return error_code::invalid_shard_state;
+                        }
+
+                        if(k_it->second.m_key_state != key_state::locking) {
+                            m_log->error("Shard state not locking");
+                            return error_code::invalid_shard_state;
+                        }
+
+                        k_it->second.m_key_state = key_state::locked;
+
+                        // Note for Michael: These errors are related to type mismatch
+                        k_it->second.m_value = std::move(value);
+
+                        m_log->trace(this,
+                                     "Broker locked key for",
+                                     ticket_number);
+
+                        return mp;
+                    }
+                    // This would happen if there are no keys
+                    return try_lock_batch_return_type();
+                },
+                [&, keys](parsec::runtime_locking_shard::shard_error e)
+                    -> try_lock_batch_return_type {
+                    if(e.m_wounded_details.has_value()) {
+                        m_log->trace(this,
+                                     e.m_wounded_details->m_wounding_ticket,
+                                     "wounded ticket",
+                                     ticket_number);
+                    }
+                    m_log->trace(this,
+                                 "Shard error",
+                                 static_cast<int>(e.m_error_code),
+                                 "locking keys for",
+                                 ticket_number);
+                    return e;
+                }},
+            res);
+        result_callback(result);
+    }
+
     auto impl::try_lock(ticket_number_type ticket_number,
                         key_type key,
                         lock_type locktype,
@@ -157,8 +229,9 @@ namespace cbdc::parsec::broker {
 
             if(!m_directory->key_location(
                    key,
-                   [=, this](std::optional<parsec::directory::interface::
-                                               key_location_return_type> res) {
+                   [=](std::optional<
+                       parsec::directory::interface::key_location_return_type>
+                           res) {
                        handle_find_key(ticket_number,
                                        key,
                                        locktype,
@@ -177,6 +250,149 @@ namespace cbdc::parsec::broker {
         }
 
         return true;
+    }
+
+    auto impl::try_lock_batch(ticket_number_type ticket_number,
+                              std::vector<key_type> keys,
+                              std::vector<lock_type> locktypes,
+                              try_lock_batch_callback_type result_callback)
+        -> bool {
+        auto maybe_error = [&]() -> std::optional<error_code> {
+            std::unique_lock l(m_mut);
+            auto it = m_tickets.find(ticket_number);
+            if(it == m_tickets.end()) {
+                return error_code::unknown_ticket;
+            }
+
+            auto t_state = it->second;
+            switch(t_state->m_state) {
+                case ticket_state::begun:
+                    break;
+                case ticket_state::prepared:
+                    return error_code::prepared;
+                case ticket_state::committed:
+                    return error_code::committed;
+                case ticket_state::aborted:
+                    t_state->m_state = ticket_state::begun;
+                    t_state->m_shard_states.clear();
+                    m_log->trace(this, "broker restarting", ticket_number);
+                    break;
+            }
+
+            std::unordered_map<key_type, lock_type> key_locktypes;
+            size_t i = 0;
+            for(int i = 0; i < locktypes.size(); i++) {
+                key_locktypes[keys[i]] = locktypes[i];
+            }
+
+            if(!m_directory->key_location_batch(
+                   keys,
+                   [=](std::optional<parsec::directory::interface::
+                                         key_location_batch_return_type> res) {
+                       handle_find_key_batch(ticket_number,
+                                             key_locktypes,
+                                             result_callback,
+                                             res);
+                   })) {
+                m_log->error("Failed to make key location directory request");
+                return error_code::directory_unreachable;
+            }
+
+            return std::nullopt;
+        }();
+
+        if(maybe_error.has_value()) {
+            result_callback(maybe_error.value());
+        }
+
+        return true;
+    }
+
+    void impl::handle_find_key_batch(
+        ticket_number_type ticket_number,
+        std::unordered_map<key_type, lock_type> key_locktypes,
+        try_lock_batch_callback_type result_callback,
+        std::optional<
+            parsec::directory::interface::key_location_batch_return_type>
+            res) {
+        auto maybe_error = [&]() -> std::optional<try_lock_batch_return_type> {
+            auto values = std::vector<value_type>();
+            std::unique_lock l(m_mut);
+            assert(res.has_value());
+            assert(res.value().size() < m_shards.size());
+            auto ticket = m_tickets.find(ticket_number);
+            if(ticket == m_tickets.end()) {
+                m_log->error("Unknown ticket number");
+                return error_code::unknown_ticket;
+            }
+
+            auto tss = ticket->second;
+            switch(tss->m_state) {
+                case ticket_state::begun:
+                    break;
+                case ticket_state::prepared:
+                    return error_code::prepared;
+                case ticket_state::committed:
+                    return error_code::committed;
+                case ticket_state::aborted:
+                    return error_code::aborted;
+            }
+
+            if(!res.has_value()) {
+                return error_code::directory_unreachable;
+            }
+
+            for(const auto& [shard_idx, keys] : res.value()) {
+                auto& ss = tss->m_shard_states[shard_idx];
+                auto first_lock = ss.m_key_states.empty();
+                auto key_locktypes_inner
+                    = std::unordered_map<key_type, lock_type>();
+                for(const auto& key : keys) {
+                    key_locktypes_inner[key] = key_locktypes[key];
+                }
+                for(const auto& key : keys) {
+                    auto locktype = key_locktypes[key];
+                    auto it = ss.m_key_states.find(key);
+                    if(it != ss.m_key_states.end()
+                       && it->second.m_key_state == key_state::locked
+                       && it->second.m_locktype >= locktype) {
+                        assert(it->second.m_value.has_value());
+                        values.push_back(it->second.m_value.value());
+                        key_locktypes_inner.erase(key);
+                        continue;
+                    }
+
+                    auto& ks = ss.m_key_states[key];
+
+                    ks.m_key_state = key_state::locking;
+                    ks.m_locktype = locktype;
+                }
+                // Next: Stub this out for a call on try_lock_batch (against
+                // the shard)
+                if(!m_shards[shard_idx]->try_lock_batch(
+                       ticket_number,
+                       m_broker_id,
+                       key_locktypes_inner,
+                       first_lock,
+                       [=](const parsec::runtime_locking_shard::interface::
+                               try_lock_batch_return_type& lock_res) {
+                           handle_lock_batch(ticket_number,
+                                             keys,
+                                             shard_idx,
+                                             result_callback,
+                                             lock_res);
+                       })) {
+                    m_log->error(
+                        "Failed to make try_lock_batch shard request");
+                    return error_code::shard_unreachable;
+                }
+            }
+            return std::nullopt;
+        }();
+
+        if(maybe_error.has_value()) {
+            result_callback(maybe_error.value());
+        }
     }
 
     void impl::handle_prepare(
@@ -295,8 +511,8 @@ namespace cbdc::parsec::broker {
             auto sidx = shard.first;
             if(!m_shards[sidx]->commit(
                    ticket_number,
-                   [=, this](const parsec::runtime_locking_shard::interface::
-                                 commit_return_type& comm_res) {
+                   [=](const parsec::runtime_locking_shard::interface::
+                           commit_return_type& comm_res) {
                        handle_commit(commit_cb, ticket_number, sidx, comm_res);
                    })) {
                 m_log->error("Failed to make commit shard request");
@@ -544,8 +760,8 @@ namespace cbdc::parsec::broker {
                 shard.second.m_state = shard_state_type::finishing;
                 if(!m_shards[sidx]->finish(
                        ticket_number,
-                       [=, this](const parsec::runtime_locking_shard::
-                                     interface::finish_return_type& res) {
+                       [=](const parsec::runtime_locking_shard::interface::
+                               finish_return_type& res) {
                            handle_finish(result_callback,
                                          ticket_number,
                                          sidx,
@@ -617,8 +833,8 @@ namespace cbdc::parsec::broker {
                 shard.second.m_state = shard_state_type::rolling_back;
                 if(!m_shards[sidx]->rollback(
                        ticket_number,
-                       [=, this](const parsec::runtime_locking_shard::
-                                     interface::rollback_return_type& res) {
+                       [=](const parsec::runtime_locking_shard::interface::
+                               rollback_return_type& res) {
                            handle_rollback(result_callback,
                                            ticket_number,
                                            sidx,
@@ -759,8 +975,11 @@ namespace cbdc::parsec::broker {
             if(!res.has_value()) {
                 return error_code::directory_unreachable;
             }
-
             auto shard_idx = res.value();
+            if(res.value() >= m_shards.size()) {
+                return error_code::invalid_shard_id;
+            }
+
             auto& ss = tss->m_shard_states[shard_idx];
             auto first_lock = ss.m_key_states.empty();
             auto it = ss.m_key_states.find(key);
@@ -782,8 +1001,8 @@ namespace cbdc::parsec::broker {
                    key,
                    locktype,
                    first_lock,
-                   [=, this](const parsec::runtime_locking_shard::interface::
-                                 try_lock_return_type& lock_res) {
+                   [=](const parsec::runtime_locking_shard::interface::
+                           try_lock_return_type& lock_res) {
                        handle_lock(ticket_number,
                                    key,
                                    shard_idx,

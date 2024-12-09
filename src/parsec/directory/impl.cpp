@@ -18,4 +18,17 @@ namespace cbdc::parsec::directory {
         result_callback(shard);
         return true;
     }
+
+    auto impl::key_location_batch(
+        std::vector<runtime_locking_shard::key_type> keys,
+        key_location_batch_callback_type result_callback) -> bool {
+        auto key_hashes = std::unordered_map<uint64_t, std::vector<runtime_locking_shard::key_type>>();
+        for(const auto& key : keys) {
+            auto key_hash = m_siphash(key);
+            auto shard = key_hash % m_n_shards;
+            key_hashes[shard].push_back(key);
+        }
+        result_callback(key_hashes);
+        return true;
+    }
 }

@@ -42,6 +42,25 @@ namespace cbdc::parsec::runtime_locking_shard {
                       bool first_lock,
                       try_lock_callback_type result_callback) -> bool override;
 
+        /// Locks the given batch of keys for a ticket and returns the associated values.
+        /// Returns a vector of values or an error code if the lock batch is incomplete.
+        /// If lock is unavailable, lock will be queued. May wound other
+        /// tickets to acquire the lock.
+        /// \param ticket_number ticket number.
+        /// \param broker_id ID of broker managing ticket.
+        /// \param keys keys to lock.
+        /// \param locktypes types of locks to acquire.
+        /// \param first_lock true if this is the first lock.
+        /// \param result_callback function to call with the values or error
+        ///                        codes.
+        /// \return true if the operation was initiated successfully.
+        auto try_lock_batch(ticket_number_type ticket_number,
+                            broker_id_type broker_id,
+                            std::unordered_map<key_type, lock_type> key_locktypes,
+                            bool first_lock,
+                            try_lock_batch_callback_type result_callback) -> bool override;
+
+
         /// Prepares a ticket with the given state updates.
         /// \param ticket_number ticket number.
         /// \param broker_id ID of broker managing ticket.
@@ -109,6 +128,11 @@ namespace cbdc::parsec::runtime_locking_shard {
             rw_lock_type m_lock;
         };
 
+        struct data_batch {
+            std::unordered_map<key_type, try_lock_return_type> m_values;
+            uint64_t m_capacity;
+        };
+
         using key_set_type
             = std::unordered_set<key_type, hashing::const_sip_hash<key_type>>;
 
@@ -141,6 +165,11 @@ namespace cbdc::parsec::runtime_locking_shard {
                            hashing::const_sip_hash<key_type>>
             m_state;
         std::unordered_map<ticket_number_type, ticket_state_type> m_tickets;
+
+        // Batches associated with tickets
+        std::unordered_map<ticket_number_type, data_batch> m_data_batches;
+        // A lock for the data batches
+        std::mutex m_data_batches_mut;
 
         auto
         wound_tickets(key_type key,

@@ -144,6 +144,36 @@ namespace cbdc::parsec::runtime_locking_shard {
                               try_lock_callback_type result_callback) -> bool
             = 0;
 
+        /// Return type from a try lock operation. Either the value at the
+        /// requested key or an error code.
+        using try_lock_batch_return_type
+            = std::variant<std::unordered_map<key_type, try_lock_return_type>,
+                           shard_error>;
+        /// Function type for try lock operation results.
+        using try_lock_batch_callback_type
+            = std::function<void(try_lock_batch_return_type)>;
+
+        /// Requests a lock on the given keys and returns the values associated
+        /// with the keys. Lock may not be acquired immediately if another
+        /// ticket already holds the write lock. May cause other tickets to be
+        /// wounded if the requested lock is already held by a younger ticket.
+        /// Cannot be used once a ticket is prepared or committed.
+        /// \param ticket_number ticket number requesting the lock.
+        /// \param broker_id broker ID managing the ticket.
+        /// \param keys keys to lock.
+        /// \param locktypes types of locks to acquire.
+        /// \param first_lock true if this is the first lock.
+        /// \param result_callback function to call with the values or error
+        ///                        codes.
+        /// \return true if the operation was initiated successfully.
+        virtual auto
+        try_lock_batch(ticket_number_type ticket_number,
+                       broker_id_type broker_id,
+                       std::unordered_map<key_type, lock_type> key_locktypes,
+                       bool first_lock,
+                       try_lock_batch_callback_type result_callback) -> bool
+            = 0;
+
         /// Return type from a prepare operation. An error, if applicable.
         using prepare_return_type = std::optional<shard_error>;
         /// Callback function type for the result of a prepare operation.
