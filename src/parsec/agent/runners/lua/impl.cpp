@@ -59,6 +59,7 @@ namespace cbdc::parsec::agent::runner {
         luaL_openlibs(m_state.get());
 
         lua_register(m_state.get(), "check_sig", &lua_runner::check_sig);
+        lua_register(m_state.get(), "make_hash", &lua_runner::make_hash);
 
         static constexpr auto function_name = "contract";
 
@@ -300,4 +301,29 @@ namespace cbdc::parsec::agent::runner {
 
         return 0;
     }
+	
+    auto lua_runner::make_hash(lua_State* L) -> int {
+        int n = lua_gettop(L);
+        if(n != 1) {
+            lua_pushliteral(L, "hash takes 1 arg");
+            lua_error(L);
+        }
+        if(lua_isstring(L, 1) != 1) {
+                lua_pushliteral(L, "invalid preimage");
+                lua_error(L);
+            }
+        size_t sz{};
+        const auto* str = lua_tolstring(L, 1, &sz);
+        assert(str != nullptr);
+        // compute hash
+        auto sha = CSHA256();
+        auto unsigned_str = std::vector<unsigned char>(sz);
+        std::memcpy(unsigned_str.data(), str, sz);
+        sha.Write(unsigned_str.data(), sz);
+        cbdc::hash_t computed_hash{};
+        sha.Finalize(computed_hash.data());
+        lua_pushlstring(L, reinterpret_cast<char*>(computed_hash.data()), sz);
+        return 0;
+    }
+
 }
